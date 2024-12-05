@@ -169,8 +169,12 @@ class NotebookRow extends TableRow {
     return this.find().findByTestId('notebook-route-link');
   }
 
-  findHaveNotebookStatusText() {
-    return this.find().findByTestId('notebook-status-text');
+  findHaveNotebookStatusText(timeout = 10000) {
+    return this.find().findByTestId('notebook-status-text', { timeout });
+  }
+
+  expectStatusLabelToBe(statusValue: string, timeout?: number) {
+    this.findHaveNotebookStatusText(timeout).should('have.text', statusValue);
   }
 
   findNotebookStart() {
@@ -183,6 +187,27 @@ class NotebookRow extends TableRow {
 
   findNotebookStatusPopover(name: string) {
     return cy.findByTestId('notebook-status-popover').contains(name);
+  }
+}
+
+class AttachExistingStorageModal extends Modal {
+  constructor() {
+    super('Attach Existing Storage');
+  }
+
+  selectExistingPersistentStorage(name: string) {
+    cy.findByTestId('persistent-storage-group')
+      .findByPlaceholderText('Select a persistent storage')
+      .click();
+    cy.findByTestId('persistent-storage-group').contains('button.pf-v5-c-menu__item', name).click();
+  }
+
+  findStandardPathInput() {
+    return cy.findByTestId('mount-path-folder-value');
+  }
+
+  findAttachButton() {
+    return cy.findByTestId('modal-submit-button');
   }
 }
 
@@ -247,6 +272,10 @@ class CreateSpawnerPage {
     return new StorageTable();
   }
 
+  getNameInput() {
+    return cy.findByTestId('workbench-name');
+  }
+
   private findPVSizeField() {
     return cy.findByTestId('create-new-storage-size');
   }
@@ -255,11 +284,8 @@ class CreateSpawnerPage {
     return cy.findByTestId('value-unit-select');
   }
 
-  selectExistingPersistentStorage(name: string) {
-    cy.findByTestId('persistent-storage-group')
-      .findByRole('button', { name: 'Typeahead menu toggle' })
-      .click();
-    cy.get('[id="dashboard-page-main"]').contains('button.pf-v5-c-menu__item', name).click();
+  findAttachExistingStorageButton() {
+    return cy.findByTestId('existing-storage-button');
   }
 
   selectPVSize(name: string) {
@@ -439,3 +465,4 @@ export const editSpawnerPage = new EditSpawnerPage();
 export const storageModal = new StorageModal();
 export const notFoundSpawnerPage = new NotFoundSpawnerPage();
 export const attachConnectionModal = new AttachConnectionModal();
+export const attachExistingStorageModal = new AttachExistingStorageModal();
