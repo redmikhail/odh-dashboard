@@ -20,7 +20,7 @@ type StorageClassSelectProps = {
   storageClassName?: string;
   setStorageClassName: (name: string) => void;
   disableStorageClassSelect?: boolean;
-  menuAppendTo?: HTMLElement;
+  menuAppendTo?: HTMLElement | 'inline';
 };
 
 const StorageClassSelect: React.FC<StorageClassSelectProps> = ({
@@ -75,7 +75,7 @@ const StorageClassSelect: React.FC<StorageClassSelectProps> = ({
           <SplitItem>{config?.displayName || sc.metadata.name}</SplitItem>
           <SplitItem isFilled />
           <SplitItem>
-            {/* If multiple storage classes have `isDefault` set to true, 
+            {/* If multiple storage classes have `isDefault` set to true,
             prioritize the one returned by useDefaultStorageClass() as the default class */}
             {sc.metadata.name === defaultSc?.metadata.name && (
               <Label isCompact color="green" data-testid="is-default-label">
@@ -87,6 +87,10 @@ const StorageClassSelect: React.FC<StorageClassSelectProps> = ({
       ),
     };
   });
+
+  if (storageClassesLoaded && !hasStorageClassConfigs) {
+    return null;
+  }
 
   return hasStorageClassConfigs ? (
     <FormGroup label="Storage class" fieldId="storage-class">

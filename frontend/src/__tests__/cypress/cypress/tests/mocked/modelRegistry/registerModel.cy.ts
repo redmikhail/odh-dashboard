@@ -97,6 +97,30 @@ const initIntercepts = () => {
     },
     mockModelArtifact(),
   ).as('createModelArtifact');
+
+  cy.interceptOdh(
+    'PATCH /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/registered_models/:registeredModelId',
+    {
+      path: {
+        serviceName: 'modelregistry-sample',
+        apiVersion: MODEL_REGISTRY_API_VERSION,
+        registeredModelId: '1',
+      },
+    },
+    mockRegisteredModel({ id: '1', name: 'Test model name' }),
+  ).as('updateRegisteredModel');
+
+  cy.interceptOdh(
+    'PATCH /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/model_versions/:modelVersionId',
+    {
+      path: {
+        serviceName: 'modelregistry-sample',
+        apiVersion: MODEL_REGISTRY_API_VERSION,
+        modelVersionId: '2',
+      },
+    },
+    mockModelVersion({ id: '2', name: 'Test version name' }),
+  ).as('updateModelVersion');
 };
 
 describe('Register model page', () => {
@@ -135,7 +159,7 @@ describe('Register model page', () => {
     registerModelPage
       .findConnectionSelector()
       .contains('Select a project to view its available data connections');
-    registerModelPage.projectDropdown.selectItem('Test Project');
+    registerModelPage.projectDropdown.openAndSelectItem('Test Project', true);
     registerModelPage.findConnectionSelector().contains('No available data connections');
   });
 
@@ -150,7 +174,7 @@ describe('Register model page', () => {
     registerModelPage
       .findConnectionSelector()
       .contains('Select a project to view its available data connections');
-    registerModelPage.projectDropdown.selectItem('Test Project');
+    registerModelPage.projectDropdown.openAndSelectItem('Test Project', true);
     registerModelPage.findConnectionSelector().contains('Select data connection');
     registerModelPage.findConnectionSelector().findDropdownItem('Test Secret').click();
     registerModelPage.findAutofillButton().click();

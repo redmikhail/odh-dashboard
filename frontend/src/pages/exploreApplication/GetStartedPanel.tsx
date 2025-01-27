@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   ActionList,
   ActionListItem,
+  ActionListGroup,
   Alert,
   Button,
   ButtonVariant,
@@ -11,9 +12,9 @@ import {
   DrawerHead,
   DrawerPanelBody,
   DrawerPanelContent,
-  Text,
-  TextContent,
   Tooltip,
+  Skeleton,
+  Content,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
 import { OdhApplication } from '~/types';
@@ -22,6 +23,7 @@ import { markdownConverter } from '~/utilities/markdown';
 import { useAppContext } from '~/app/AppContext';
 import { fireMiscTrackingEvent } from '~/concepts/analyticsTracking/segmentIOUtils';
 import { useIntegratedAppStatus } from '~/pages/exploreApplication/useIntegratedAppStatus';
+import { useUser } from '~/redux/selectors';
 
 const DEFAULT_BETA_TEXT =
   'This application is available for early access prior to official ' +
@@ -37,34 +39,40 @@ type GetStartedPanelProps = {
 const GetStartedPanel: React.FC<GetStartedPanelProps> = ({ selectedApp, onClose, onEnable }) => {
   const { dashboardConfig } = useAppContext();
   const { enablement } = dashboardConfig.spec.dashboardConfig;
-  const [{ isInstalled, canInstall, error }, loaded] = useIntegratedAppStatus(selectedApp);
+  const [{ isEnabled, canInstall, error }, loaded] = useIntegratedAppStatus(selectedApp);
+  const { isAdmin } = useUser();
 
   if (!selectedApp) {
     return null;
   }
 
   const renderEnableButton = () => {
-    if (!selectedApp.spec.enable || selectedApp.spec.isEnabled || isInstalled) {
+    if (!selectedApp.spec.enable || selectedApp.spec.isEnabled || isEnabled || !isAdmin) {
       return null;
     }
+
+    if (!loaded && !error) {
+      return <Skeleton style={{ minWidth: 100 }} fontSize="3xl" />;
+    }
+
     const button = (
       <Button
         variant={ButtonVariant.secondary}
         onClick={onEnable}
         isDisabled={!enablement || !canInstall}
-        isLoading={!loaded && !error}
       >
         Enable
       </Button>
     );
-    if (enablement) {
-      return button;
+
+    if (!enablement || !canInstall) {
+      return (
+        <Tooltip content="This feature has been disabled by an administrator.">
+          <span>{button}</span>
+        </Tooltip>
+      );
     }
-    return (
-      <Tooltip content="This feature has been disabled by an administrator.">
-        <span>{button}</span>
-      </Tooltip>
-    );
+    return button;
   };
 
   return (
@@ -75,14 +83,14 @@ const GetStartedPanel: React.FC<GetStartedPanelProps> = ({ selectedApp, onClose,
       minSize="350px"
     >
       <DrawerHead>
-        <TextContent>
-          <Text component="h2" style={{ marginBottom: 0 }}>
+        <Content>
+          <Content component="h2" style={{ marginBottom: 0 }}>
             {selectedApp.spec.displayName}
-          </Text>
+          </Content>
           {selectedApp.spec.provider ? (
-            <Text component="small">by {selectedApp.spec.provider}</Text>
+            <Content component="small">by {selectedApp.spec.provider}</Content>
           ) : null}
-        </TextContent>
+        </Content>
         <DrawerActions>
           <DrawerCloseButton onClick={onClose} />
         </DrawerActions>
@@ -90,24 +98,26 @@ const GetStartedPanel: React.FC<GetStartedPanelProps> = ({ selectedApp, onClose,
       {selectedApp.spec.getStartedLink && (
         <DrawerPanelBody>
           <ActionList>
-            <ActionListItem>
-              <Button
-                icon={<ExternalLinkAltIcon />}
-                onClick={() =>
-                  fireMiscTrackingEvent('Explore card get started clicked', {
-                    name: selectedApp.metadata.name,
-                  })
-                }
-                iconPosition="right"
-                href={selectedApp.spec.getStartedLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                component="a"
-              >
-                Get started
-              </Button>
-            </ActionListItem>
-            <ActionListItem>{renderEnableButton()}</ActionListItem>
+            <ActionListGroup>
+              <ActionListItem>
+                <Button
+                  icon={<ExternalLinkAltIcon />}
+                  onClick={() =>
+                    fireMiscTrackingEvent('Explore card get started clicked', {
+                      name: selectedApp.metadata.name,
+                    })
+                  }
+                  iconPosition="end"
+                  href={selectedApp.spec.getStartedLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  component="a"
+                >
+                  Get started
+                </Button>
+              </ActionListItem>
+              <ActionListItem>{renderEnableButton()}</ActionListItem>
+            </ActionListGroup>
           </ActionList>
         </DrawerPanelBody>
       )}

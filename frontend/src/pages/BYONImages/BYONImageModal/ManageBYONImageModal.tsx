@@ -1,14 +1,6 @@
 import React from 'react';
-import {
-  Form,
-  FormGroup,
-  Modal,
-  ModalVariant,
-  Tabs,
-  Tab,
-  TabTitleText,
-  Popover,
-} from '@patternfly/react-core';
+import { Form, FormGroup, Tabs, Tab, TabTitleText, Popover } from '@patternfly/react-core';
+import { Modal, ModalVariant } from '@patternfly/react-core/deprecated';
 import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import { importBYONImage, updateBYONImage } from '~/services/imagesService';
 import { ResponseStatus, BYONImagePackage, BYONImage } from '~/types';
@@ -45,13 +37,8 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingIma
   >([]);
   const [software, setSoftware] = React.useState<BYONImagePackage[]>([]);
   const [packages, setPackages] = React.useState<BYONImagePackage[]>([]);
-  const [tempSoftware, setTempSoftware] = React.useState<BYONImagePackage[]>([]);
-  const [tempPackages, setTempPackages] = React.useState<BYONImagePackage[]>([]);
-  const [editIndex, setEditIndex] = React.useState<number>();
   const userName = useAppSelector((state) => state.user || '');
   const [error, setError] = React.useState<Error>();
-
-  const isEditing = editIndex !== undefined;
 
   const { data: byonNameDesc, onDataChange: setByonNameDesc } = useK8sNameDescriptionFieldData({
     initialData: existingImage
@@ -71,8 +58,6 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingIma
       setRepository(existingImage.url);
       setPackages(existingImage.packages);
       setSoftware(existingImage.software);
-      setTempPackages(existingImage.packages);
-      setTempSoftware(existingImage.software);
       setRecommendedAcceleratorIdentifiers(existingImage.recommendedAcceleratorIdentifiers);
     }
   }, [existingImage]);
@@ -120,21 +105,16 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingIma
       title={`${existingImage ? 'Update' : 'Import'} notebook image`}
       isOpen
       onClose={() => onClose(false)}
-      showClose={!isEditing}
       footer={
         <DashboardModalFooter
           error={error}
           alertTitle={`Error ${existingImage ? 'updating' : 'importing'} notebook image`}
           submitLabel={existingImage ? 'Update' : 'Import'}
           isSubmitDisabled={
-            isProgress ||
-            !isK8sNameDescriptionDataValid(byonNameDesc) ||
-            repository === '' ||
-            isEditing
+            isProgress || !isK8sNameDescriptionDataValid(byonNameDesc) || repository === ''
           }
           onSubmit={submit}
           onCancel={() => onClose(false)}
-          isCancelDisabled={isEditing}
         />
       }
       data-testid="notebook-image-modal"
@@ -157,7 +137,7 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingIma
         />
         <FormGroup
           label="Accelerator identifier"
-          labelIcon={
+          labelHelp={
             <Popover bodyContent="Add recommended accelerator identifiers for this image.">
               <DashboardPopupIconButton
                 icon={<OutlinedQuestionCircleIcon />}
@@ -186,7 +166,6 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingIma
               aria-label="Displayed content software tab"
               data-testid="displayed-content-software-tab"
               tabContentId={`tabContent-${DisplayedContentTab.SOFTWARE}`}
-              isDisabled={activeTabKey !== DisplayedContentTab.SOFTWARE && isEditing}
             />
             <Tab
               eventKey={DisplayedContentTab.PACKAGES}
@@ -194,7 +173,6 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingIma
               aria-label="Displayed content packages tab"
               data-testid="displayed-content-packages-tab"
               tabContentId={`tabContent-${DisplayedContentTab.PACKAGES}`}
-              isDisabled={activeTabKey !== DisplayedContentTab.PACKAGES && isEditing}
             />
           </Tabs>
           <DisplayedContentTabContent
@@ -202,20 +180,12 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingIma
             tabKey={DisplayedContentTab.SOFTWARE}
             resources={software}
             setResources={setSoftware}
-            tempResources={tempSoftware}
-            setTempResources={setTempSoftware}
-            editIndex={editIndex}
-            setEditIndex={setEditIndex}
           />
           <DisplayedContentTabContent
             activeKey={activeTabKey}
             tabKey={DisplayedContentTab.PACKAGES}
             resources={packages}
             setResources={setPackages}
-            tempResources={tempPackages}
-            setTempResources={setTempPackages}
-            editIndex={editIndex}
-            setEditIndex={setEditIndex}
           />
         </FormGroup>
       </Form>

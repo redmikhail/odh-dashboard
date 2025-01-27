@@ -176,6 +176,7 @@ export type OdhApplication = {
     };
     featureFlag?: string;
     internalRoute?: string;
+    error?: string;
   };
 };
 
@@ -302,6 +303,25 @@ export type Toleration = {
   value?: string;
   effect?: TolerationEffect;
   tolerationSeconds?: number;
+};
+
+export enum IdentifierResourceType {
+  CPU = 'CPU',
+  MEMORY = 'Memory',
+}
+
+export type Identifier = {
+  displayName: string;
+  identifier: string;
+  minCount: number | string;
+  maxCount: number | string;
+  defaultCount: number | string;
+  resourceType?: IdentifierResourceType;
+};
+
+export type NodeSelector = {
+  key: string;
+  value: string;
 };
 
 export type PodContainer = {
@@ -649,9 +669,17 @@ export type KeyValuePair = {
   value: string;
 };
 
+export enum VariablesValidationStatus {
+  UNKNOWN = 'Unknown',
+  FAILED = 'False',
+  SUCCESS = 'True',
+}
+
 export type IntegrationAppStatus = {
   isInstalled: boolean;
   isEnabled: boolean;
   canInstall: boolean;
+  variablesValidationStatus?: VariablesValidationStatus;
+  variablesValidationTimestamp?: string;
   error: string;
 };

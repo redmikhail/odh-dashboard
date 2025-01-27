@@ -44,7 +44,6 @@ import ContainerSizeSelector from './deploymentSize/ContainerSizeSelector';
 import EnvironmentVariables from './environmentVariables/EnvironmentVariables';
 import { getCompatibleAcceleratorIdentifiers } from './spawnerUtils';
 import { useNotebookEnvVariables } from './environmentVariables/useNotebookEnvVariables';
-import DataConnectionField from './dataConnection/DataConnectionField';
 import { useNotebookDataConnection } from './dataConnection/useNotebookDataConnection';
 import { useNotebookSizeState } from './useNotebookSizeState';
 import useDefaultStorageClass from './storage/useDefaultStorageClass';
@@ -58,6 +57,7 @@ import { defaultClusterStorage } from './storage/constants';
 import { ClusterStorageEmptyState } from './storage/ClusterStorageEmptyState';
 import AttachExistingStorageModal from './storage/AttachExistingStorageModal';
 import WorkbenchStorageModal from './storage/WorkbenchStorageModal';
+import DataConnectionField from './dataConnection/DataConnectionField';
 
 type SpawnerPageProps = {
   existingNotebook?: NotebookKind;
@@ -221,10 +221,10 @@ const SpawnerPage: React.FC<SpawnerPageProps> = ({ existingNotebook }) => {
       empty={false}
     >
       <PageSection
+        hasBodyWrapper={false}
         isFilled
         id={ScrollableSelectorID}
         aria-label="spawner-page-spawner-section"
-        variant="light"
       >
         <GenericSidebar sections={sectionIDs} titles={SpawnerPageSectionTitles}>
           <Form style={{ maxWidth: 625 }}>
@@ -323,6 +323,7 @@ const SpawnerPage: React.FC<SpawnerPageProps> = ({ existingNotebook }) => {
                 <ClusterStorageEmptyState />
               )}
             </FormSection>
+
             {isConnectionTypesEnabled ? (
               <ConnectionsFormSection
                 project={currentProject}
@@ -334,11 +335,7 @@ const SpawnerPage: React.FC<SpawnerPageProps> = ({ existingNotebook }) => {
                 setSelectedConnections={setNotebookConnections}
               />
             ) : (
-              <FormSection
-                title={SpawnerPageSectionTitles[SpawnerPageSectionID.DATA_CONNECTIONS]}
-                id={SpawnerPageSectionID.DATA_CONNECTIONS}
-                aria-label={SpawnerPageSectionTitles[SpawnerPageSectionID.DATA_CONNECTIONS]}
-              >
+              <FormSection title="Data connections">
                 <DataConnectionField
                   dataConnectionData={dataConnectionData}
                   setDataConnectionData={setDataConnectionData}
@@ -348,7 +345,7 @@ const SpawnerPage: React.FC<SpawnerPageProps> = ({ existingNotebook }) => {
           </Form>
         </GenericSidebar>
       </PageSection>
-      <PageSection stickyOnBreakpoint={{ default: 'bottom' }} variant="light">
+      <PageSection hasBodyWrapper={false} stickyOnBreakpoint={{ default: 'bottom' }}>
         <Stack hasGutter>
           {restartNotebooks.length !== 0 && (
             <StackItem>
@@ -395,7 +392,9 @@ const SpawnerPage: React.FC<SpawnerPageProps> = ({ existingNotebook }) => {
                   {
                     storageType: StorageType.EXISTING_PVC,
                     id: storageData.length + 1,
-                    name: attachData.storage,
+                    name: attachData.pvc
+                      ? getDisplayNameFromK8sResource(attachData.pvc)
+                      : attachData.storage,
                     existingPvc: attachData.pvc,
                     mountPath: attachData.mountPath.value,
                     description: attachData.pvc?.metadata.annotations?.['openshift.io/description'],

@@ -5,6 +5,7 @@ import { HTPASSWD_CLUSTER_ADMIN_USER } from '~/__tests__/cypress/cypress/utils/e
 import {
   getDashboardConfig,
   getNotebookControllerConfig,
+  getNotebookControllerCullerConfig,
 } from '~/__tests__/cypress/cypress/utils/oc_commands/project';
 
 /* eslint-disable @typescript-eslint/no-namespace */
@@ -41,6 +42,13 @@ declare global {
         name: string | RegExp,
         isDropdownToggle?: boolean,
       ) => Cypress.Chainable<JQuery>;
+
+      /**
+       * Finds a patternfly dropdown item by first opening the dropdown if not already opened.
+       *
+       * @param name the name of the item
+       */
+      findMenuItem: (name: string | RegExp) => Cypress.Chainable<JQuery>;
 
       /**
        * Finds a patternfly dropdown item by first opening the dropdown if not already opened.
@@ -148,6 +156,20 @@ declare global {
        * @returns A Cypress.Chainable that resolves to the requested config value or the full config object.
        */
       getNotebookControllerConfig: (key?: string) => Cypress.Chainable<DashboardConfig | unknown>;
+
+      /**
+       * Retrieves the Notebook Controller Culler Config from OpenShift and returns either the full config or a specific value.
+       *
+       * When no key is provided, returns the entire Notebook Controller Culler Config object.
+       * When a key is provided, returns the specific value for that key.
+       *
+       * @param key Optional. The specific config key to retrieve. Use dot notation for nested properties.
+       *
+       * @returns A Cypress.Chainable that resolves to the requested config value or the full config object.
+       */
+      getNotebookControllerCullerConfig: (
+        key?: string,
+      ) => Cypress.Chainable<DashboardConfig | unknown>;
     }
   }
 }
@@ -204,7 +226,7 @@ Cypress.Commands.add(
         if ($el.attr('aria-expanded') === 'false') {
           cy.wrap($el).click();
         }
-        return cy.wrap($el.parent()).findByRole('menuitem', { name });
+        return cy.get('[data-ouia-component-type="PF6/Dropdown"]').findByRole('menuitem', { name });
       });
   },
 );
@@ -215,7 +237,17 @@ Cypress.Commands.add('findDropdownItem', { prevSubject: 'element' }, (subject, n
     if ($el.attr('aria-expanded') === 'false') {
       cy.wrap($el).click();
     }
-    return cy.wrap($el).parent().findByRole('menuitem', { name });
+    return cy.get('[data-ouia-component-type="PF6/Dropdown"]').findByRole('menuitem', { name });
+  });
+});
+
+Cypress.Commands.add('findMenuItem', { prevSubject: 'element' }, (subject, name) => {
+  Cypress.log({ displayName: 'findMenuItem', message: name });
+  return cy.wrap(subject).then(($el) => {
+    if ($el.attr('aria-expanded') === 'false') {
+      cy.wrap($el).click();
+    }
+    return cy.get('[data-ouia-component-type="PF6/Menu"]').findByRole('menuitem', { name });
   });
 });
 
@@ -273,6 +305,7 @@ Cypress.Commands.overwriteQuery('findAllByTestId', function findAllByTestId(...a
 });
 Cypress.Commands.add('getNotebookControllerConfig', getNotebookControllerConfig);
 Cypress.Commands.add('getDashboardConfig', getDashboardConfig);
+Cypress.Commands.add('getNotebookControllerCullerConfig', getNotebookControllerCullerConfig);
 
 const enhancedFindByTestId = (
   command: Cypress.Command,

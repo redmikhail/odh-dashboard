@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Checkbox, Flex, FlexItem, Modal, Stack, StackItem } from '@patternfly/react-core';
+import { Button, Checkbox, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
 import NotebookRouteLink from './NotebookRouteLink';
 import useStopNotebookModalAvailability from './useStopNotebookModalAvailability';
@@ -56,12 +57,7 @@ const StopNotebookConfirmModal: React.FC<StopNotebookConfirmProps> = ({
             <Flex>
               <FlexItem spacer={{ default: 'spacerXs' }}>To save changes, </FlexItem>
               <FlexItem spacer={{ default: 'spacerNone' }}>
-                <NotebookRouteLink
-                  label="open the workbench"
-                  notebook={notebook}
-                  isRunning
-                  isLarge
-                />
+                <NotebookRouteLink label="open the workbench" notebook={notebook} isRunning />
               </FlexItem>
               <FlexItem spacer={{ default: 'spacerNone' }}>.</FlexItem>
             </Flex>

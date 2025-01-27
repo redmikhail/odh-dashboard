@@ -1,26 +1,51 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { secureAdminRoute } from '../../../../utils/route-security';
-import { KubeFastifyInstance } from '../../../../types';
+import { KubeFastifyInstance, VariablesValidationStatus } from '../../../../types';
 import { isString } from 'lodash';
-import { createNIMAccount, createNIMSecret, getNIMAccount, isAppEnabled } from './nimUtils';
+import {
+  apiKeyValidationStatus,
+  apiKeyValidationTimestamp,
+  createNIMAccount,
+  deleteNIMAccount,
+  errorMsgList,
+  getNIMAccount,
+  isAppEnabled,
+  manageNIMSecret,
+} from './nimUtils';
 
 module.exports = async (fastify: KubeFastifyInstance) => {
-  const { namespace } = fastify.kube;
   const PAGE_NOT_FOUND_MESSAGE = '404 page not found';
 
   fastify.get(
     '/',
     secureAdminRoute(fastify)(async (request: FastifyRequest, reply: FastifyReply) => {
-      await getNIMAccount(fastify, namespace)
+      await getNIMAccount(fastify)
         .then((response) => {
           if (response) {
             // Installed
             const isEnabled = isAppEnabled(response);
-            reply.send({ isInstalled: true, isEnabled: isEnabled, canInstall: false, error: '' });
+            const keyValidationStatus: string = apiKeyValidationStatus(response);
+            const keyValidationTimestamp: string = apiKeyValidationTimestamp(response);
+            const errorMsg: string = errorMsgList(response)[0];
+            reply.send({
+              isInstalled: true,
+              isEnabled: isEnabled,
+              variablesValidationStatus: keyValidationStatus,
+              variablesValidationTimestamp: keyValidationTimestamp,
+              canInstall: !isEnabled,
+              error: errorMsg,
+            });
           } else {
             // Not installed
             fastify.log.info(`NIM account does not exist`);
-            reply.send({ isInstalled: false, isEnabled: false, canInstall: true, error: '' });
+            reply.send({
+              isInstalled: false,
+              isEnabled: false,
+              variablesValidationStatus: VariablesValidationStatus.UNKNOWN,
+              variablesValidationTimestamp: '',
+              canInstall: true,
+              error: '',
+            });
           }
         })
         .catch((e) => {
@@ -34,6 +59,8 @@ module.exports = async (fastify: KubeFastifyInstance) => {
               reply.send({
                 isInstalled: false,
                 isEnabled: false,
+                variablesValidationStatus: VariablesValidationStatus.UNKNOWN,
+                variablesValidationTimestamp: '',
                 canInstall: false,
                 error: 'NIM not installed',
               });
@@ -42,7 +69,9 @@ module.exports = async (fastify: KubeFastifyInstance) => {
             fastify.log.error(`An unexpected error occurred: ${e.response.body?.message}`);
             reply.send({
               isInstalled: false,
-              isAppEnabled: false,
+              isEnabled: false,
+              variablesValidationStatus: VariablesValidationStatus.UNKNOWN,
+              variablesValidationTimestamp: '',
               canInstall: false,
               error: 'An unexpected error occurred. Please try again later.',
             });
@@ -62,36 +91,45 @@ module.exports = async (fastify: KubeFastifyInstance) => {
       ) => {
         const enableValues = request.body;
 
-        await createNIMSecret(fastify, namespace, enableValues)
-          .then(async () => {
-            await createNIMAccount(fastify, namespace)
-              .then((response) => {
-                const isEnabled = isAppEnabled(response);
-                reply.send({
-                  isInstalled: true,
-                  isEnabled: isEnabled,
-                  canInstall: false,
-                  error: '',
-                });
-              })
-              .catch((e) => {
-                const message = `Failed to create NIM account, ${e.response?.body?.message}`;
-                fastify.log.error(message);
-                reply.status(e.response.statusCode).send(new Error(message));
-              });
-          })
-          .catch((e) => {
-            if (e.response?.statusCode === 409) {
-              fastify.log.error(`NIM secret already exists, skipping creation.`);
-              reply.status(409).send(new Error(`NIM secret already exists, skipping creation.`));
-            } else {
-              fastify.log.error(`Failed to create NIM secret. ${e.response?.body?.message}`);
-              reply
-                .status(e.response.statusCode)
-                .send(new Error(`Failed to create NIM secret, ${e.response?.body?.message}`));
-            }
-          });
+        try {
+          await manageNIMSecret(fastify, enableValues);
+          // Ensure the account exists
+          try {
+            const account = await getNIMAccount(fastify);
+            const nimAccount = !account ? await createNIMAccount(fastify) : account;
+            const isEnabled = isAppEnabled(nimAccount);
+            const keyValidationStatus: string = apiKeyValidationStatus(nimAccount);
+            const keyValidationTimeStamp: string = apiKeyValidationTimestamp(nimAccount);
+            reply.send({
+              isInstalled: true,
+              isEnabled: isEnabled,
+              variablesValidationStatus: keyValidationStatus,
+              variablesValidationTimestamp: keyValidationTimeStamp,
+              canInstall: !isEnabled,
+              error: '',
+            });
+          } catch (accountError: any) {
+            const message = `Failed to create or retrieve NIM account: ${accountError.response?.body?.message}`;
+            fastify.log.error(message);
+            reply.status(accountError.response?.statusCode || 500).send(new Error(message));
+          }
+        } catch (secretError: any) {
+          const message = `Failed to create NIM secret. ${secretError.response?.body?.message}`;
+          fastify.log.error(message);
+          reply.status(secretError.response?.statusCode || 500).send(new Error(message));
+        }
       },
+    ),
+  );
+
+  fastify.delete(
+    '/',
+    secureAdminRoute(fastify)(async (request: FastifyRequest, reply: FastifyReply) =>
+      deleteNIMAccount(fastify)
+        .then((res) => res)
+        .catch((res) => {
+          reply.send(res);
+        }),
     ),
   );
 };

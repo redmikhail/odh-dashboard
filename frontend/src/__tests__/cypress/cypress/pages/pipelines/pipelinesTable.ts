@@ -168,9 +168,11 @@ class PipelinesTable {
   getRowById(id: string) {
     return new PipelinesTableRow(
       () =>
-        this.find().findByTestId(['pipeline-row', id]) as unknown as Cypress.Chainable<
-          JQuery<HTMLTableRowElement>
-        >,
+        this.find()
+          .findByTestId(['pipeline-row', id])
+          .should('exist')
+          .scrollIntoView()
+          .and('be.visible') as unknown as Cypress.Chainable<JQuery<HTMLTableRowElement>>,
     );
   }
 
@@ -195,7 +197,7 @@ class PipelinesTable {
   }
 
   findEmptyResults() {
-    return cy.findByTestId('no-result-found-title');
+    return cy.findByTestId('dashboard-empty-table-state');
   }
 
   mockDeletePipeline(pipeline: PipelineKF, namespace: string) {

@@ -4,6 +4,7 @@ import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import {
   Alert,
   Button,
+  Content,
   EmptyStateActions,
   Flex,
   FlexItem,
@@ -13,8 +14,6 @@ import {
   Popover,
   Stack,
   StackItem,
-  Text,
-  TextContent,
 } from '@patternfly/react-core';
 import { ProjectSectionID } from '~/pages/projects/screens/detail/types';
 import { ProjectDetailsContext } from '~/pages/projects/ProjectDetailsContext';
@@ -27,7 +26,6 @@ import {
 import { ServingRuntimePlatform } from '~/types';
 import { getProjectModelServingPlatform } from '~/pages/modelServing/screens/projects/utils';
 import KServeInferenceServiceTable from '~/pages/modelServing/screens/projects/KServeSection/KServeInferenceServiceTable';
-import useServingPlatformStatuses from '~/pages/modelServing/useServingPlatformStatuses';
 import DashboardPopupIconButton from '~/concepts/dashboard/DashboardPopupIconButton';
 import DetailsSection from '~/pages/projects/screens/detail/DetailsSection';
 import EmptyDetailsView from '~/components/EmptyDetailsView';
@@ -42,6 +40,7 @@ import { NamespaceApplicationCase } from '~/pages/projects/types';
 import ModelServingPlatformSelectButton from '~/pages/modelServing/screens/projects/ModelServingPlatformSelectButton';
 import ModelServingPlatformSelectErrorAlert from '~/pages/modelServing/screens/ModelServingPlatformSelectErrorAlert';
 import { modelVersionUrl } from '~/pages/modelRegistry/screens/routeUtils';
+import useServingPlatformStatuses from '~/pages/modelServing/useServingPlatformStatuses';
 import ManageServingRuntimeModal from './ServingRuntimeModal/ManageServingRuntimeModal';
 import ModelMeshServingRuntimeTable from './ModelMeshSection/ServingRuntimeTable';
 import ModelServingPlatformButtonAction from './ModelServingPlatformButtonAction';
@@ -64,8 +63,8 @@ const ModelServingPlatform: React.FC = () => {
 
   const servingPlatformStatuses = useServingPlatformStatuses();
   const kServeEnabled = servingPlatformStatuses.kServe.enabled;
-  const isNIMAvailable = servingPlatformStatuses.kServeNIM.enabled;
   const modelMeshEnabled = servingPlatformStatuses.modelMesh.enabled;
+  const isNIMAvailable = servingPlatformStatuses.kServeNIM.enabled;
 
   const {
     servingRuntimes: {
@@ -259,7 +258,7 @@ const ModelServingPlatform: React.FC = () => {
             <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapLg' }}>
               <FlexItem
                 flex={{ default: 'flex_1' }}
-                style={{ borderRight: '1px solid var(--pf-v5-global--BorderColor--100)' }}
+                style={{ borderRight: '1px solid var(--pf-t--global--border--color--default)' }}
               >
                 <EmptyDetailsView
                   iconImage={typedEmptyImage(ProjectObjectType.modelServer)}
@@ -269,11 +268,11 @@ const ModelServingPlatform: React.FC = () => {
               <FlexItem flex={{ default: 'flex_1' }}>
                 <Stack hasGutter>
                   <StackItem>
-                    <TextContent>
-                      <Text>
+                    <Content>
+                      <Content component="p">
                         Select the model serving type to be used when deploying from this project.
-                      </Text>
-                    </TextContent>
+                      </Content>
+                    </Content>
                   </StackItem>
                   <StackItem>
                     <Gallery hasGutter>

@@ -18,12 +18,15 @@ export type MockDashboardConfigType = {
   disableKServe?: boolean;
   disableKServeAuth?: boolean;
   disableKServeMetrics?: boolean;
+  disableKServeRaw?: boolean;
   disableModelMesh?: boolean;
   disableAcceleratorProfiles?: boolean;
+  disableHardwareProfiles?: boolean;
   disablePerformanceMetrics?: boolean;
   disableTrustyBiasMetrics?: boolean;
   disableDistributedWorkloads?: boolean;
   disableModelRegistry?: boolean;
+  disableModelRegistrySecureDB?: boolean;
   disableServingRuntimeParams?: boolean;
   disableConnectionTypes?: boolean;
   disableStorageClasses?: boolean;
@@ -49,12 +52,15 @@ export const mockDashboardConfig = ({
   disableKServe = false,
   disableKServeAuth = false,
   disableKServeMetrics = true,
+  disableKServeRaw = true,
   disableModelMesh = false,
   disableAcceleratorProfiles = false,
+  disableHardwareProfiles = false,
   disablePerformanceMetrics = false,
   disableTrustyBiasMetrics = false,
   disableDistributedWorkloads = false,
   disableModelRegistry = false,
+  disableModelRegistrySecureDB = false,
   disableServingRuntimeParams = false,
   disableConnectionTypes = true,
   disableStorageClasses = false,
@@ -159,10 +165,13 @@ export const mockDashboardConfig = ({
       disableKServe,
       disableKServeAuth,
       disableKServeMetrics,
+      disableKServeRaw,
       disableModelMesh,
       disableAcceleratorProfiles,
+      disableHardwareProfiles,
       disableDistributedWorkloads,
       disableModelRegistry,
+      disableModelRegistrySecureDB,
       disableServingRuntimeParams,
       disableConnectionTypes,
       disableStorageClasses,

@@ -24,7 +24,7 @@ import {
   ServingRuntimeModel,
   TemplateModel,
 } from '~/__tests__/cypress/cypress/utils/models';
-import type { InferenceServiceKind, ServingRuntimeKind } from '~/k8sTypes';
+import { DeploymentMode, type InferenceServiceKind, type ServingRuntimeKind } from '~/k8sTypes';
 import { ServingRuntimePlatform } from '~/types';
 import { be } from '~/__tests__/cypress/cypress/utils/should';
 import { asClusterAdminUser } from '~/__tests__/cypress/cypress/utils/mockUsers';
@@ -344,7 +344,7 @@ describe('Model Serving Global', () => {
       'POST',
       InferenceServiceModel,
       mockInferenceServiceK8sResource({
-        name: 'test-name',
+        name: 'test-model',
         path: 'test-model/',
         displayName: 'Test Name',
         isModelMesh: true,
@@ -408,14 +408,14 @@ describe('Model Serving Global', () => {
           labels: { 'opendatahub.io/dashboard': 'true' },
           annotations: {
             'openshift.io/display-name': 'Test Name',
-            'serving.kserve.io/deploymentMode': 'ModelMesh',
+            'serving.kserve.io/deploymentMode': DeploymentMode.ModelMesh,
           },
         },
         spec: {
           predictor: {
             model: {
               modelFormat: { name: 'onnx', version: '1' },
-              runtime: 'test-name',
+              runtime: 'test-model',
               storage: { key: 'test-secret', path: 'test-model/' },
               args: [],
               env: [],
@@ -473,14 +473,14 @@ describe('Model Serving Global', () => {
           labels: { 'opendatahub.io/dashboard': 'true' },
           annotations: {
             'openshift.io/display-name': 'trigger-error',
-            'serving.kserve.io/deploymentMode': 'ModelMesh',
+            'serving.kserve.io/deploymentMode': DeploymentMode.ModelMesh,
           },
         },
         spec: {
           predictor: {
             model: {
               modelFormat: { name: 'onnx', version: '1' },
-              runtime: 'trigger-error',
+              runtime: 'test-model',
               storage: { key: 'test-secret', path: 'test-model/test-model/' },
               args: [],
               env: [],

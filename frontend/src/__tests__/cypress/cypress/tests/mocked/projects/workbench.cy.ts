@@ -303,7 +303,7 @@ describe('Workbench page', () => {
     // cluster storage
     const storageTableRow = createSpawnerPage.getStorageTable().getRowById(0);
     storageTableRow.findNameValue().should('have.text', 'test-project-storage');
-    storageTableRow.findStorageSizeValue().should('have.text', 'Max 20Gi');
+    storageTableRow.findStorageSizeValue().should('have.text', 'Max 20GiB');
     storageTableRow.findMountPathValue().should('have.text', '/opt/app-root/src/');
 
     //add data connection
@@ -319,7 +319,10 @@ describe('Workbench page', () => {
 
     //add existing data connection
     createSpawnerPage.findExistingDataConnectionRadio().click();
-    createSpawnerPage.selectExistingDataConnection('Test Secret');
+    createSpawnerPage.findExistingDataConnectionSelect().should('have.attr', 'disabled');
+    createSpawnerPage
+      .findExistingDataConnectionSelectValueField()
+      .should('have.value', 'Test Secret');
 
     createSpawnerPage.findSubmitButton().click();
     cy.wait('@createConfigMap').then((interception) => {
@@ -938,12 +941,22 @@ describe('Workbench page', () => {
       envFrom: [
         {
           secretRef: {
-            name: 'secret-1',
+            name: 'secret-123456',
+          },
+        },
+        {
+          secretRef: {
+            name: 'custom-secret',
           },
         },
         {
           configMapRef: {
-            name: 'secret-2',
+            name: 'configmap-123456',
+          },
+        },
+        {
+          configMapRef: {
+            name: 'custom-configmap',
           },
         },
       ],
@@ -952,7 +965,7 @@ describe('Workbench page', () => {
       {
         model: SecretModel,
         ns: 'test-project',
-        name: 'secret-1',
+        name: 'secret-123456',
       },
       {
         statusCode: 404,
@@ -963,7 +976,7 @@ describe('Workbench page', () => {
       {
         model: ConfigMapModel,
         ns: 'test-project',
-        name: 'secret-2',
+        name: 'configmap-123456',
       },
       {
         statusCode: 404,
@@ -980,6 +993,29 @@ describe('Workbench page', () => {
       mock200Status({}),
     ).as('deleteWorkbench');
 
+    cy.interceptK8s(
+      'DELETE',
+      { model: SecretModel, ns: 'test-project', name: 'secret-123456' },
+      mock200Status({}),
+    ).as('deleteSecret1');
+    cy.interceptK8s(
+      'DELETE',
+      { model: ConfigMapModel, ns: 'test-project', name: 'configmap-123456' },
+      mock200Status({}),
+    ).as('deleteSecret2');
+
+    // Intercept any DELETE requests for resources that should not be deleted
+    cy.interceptK8s(
+      'DELETE',
+      { model: ConfigMapModel, ns: 'test-project', name: 'custom-configmap' },
+      cy.spy().as('deleteCustomConfigMap'),
+    );
+    cy.interceptK8s(
+      'DELETE',
+      { model: SecretModel, ns: 'test-project', name: 'custom-secret' },
+      cy.spy().as('deleteCustomSecret'),
+    );
+
     cy.interceptK8sList(
       NotebookModel,
       mockK8sResourceList([
@@ -988,5 +1024,11 @@ describe('Workbench page', () => {
     );
     deleteModal.findSubmitButton().click();
     cy.wait('@deleteWorkbench');
+    cy.wait('@deleteSecret1');
+    cy.wait('@deleteSecret2');
+
+    // Verify custom resources were not deleted
+    cy.get('@deleteCustomSecret').should('not.have.been.called');
+    cy.get('@deleteCustomConfigMap').should('not.have.been.called');
   });
 });

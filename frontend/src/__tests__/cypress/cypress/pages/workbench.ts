@@ -123,6 +123,20 @@ class NotebookConfirmModal extends Modal {
   }
 }
 
+class NotebookDeleteModal extends Modal {
+  constructor() {
+    super('Delete workbench?');
+  }
+
+  findDeleteModal() {
+    return cy.get('[data-testid="delete-modal-input"]');
+  }
+
+  findDeleteWorkbenchButton() {
+    return cy.contains('span.pf-v6-c-button__text', 'Delete workbench');
+  }
+}
+
 class NotebookRow extends TableRow {
   shouldHaveNotebookImageName(name: string) {
     this.find().find(`[data-label="Notebook image"]`).find('span').should('have.text', name);
@@ -188,6 +202,10 @@ class NotebookRow extends TableRow {
   findNotebookStatusPopover(name: string) {
     return cy.findByTestId('notebook-status-popover').contains(name);
   }
+
+  findNotebookDescription(name: string) {
+    return this.find().findByTestId('table-row-title-description').contains(name);
+  }
 }
 
 class AttachExistingStorageModal extends Modal {
@@ -199,7 +217,20 @@ class AttachExistingStorageModal extends Modal {
     cy.findByTestId('persistent-storage-group')
       .findByPlaceholderText('Select a persistent storage')
       .click();
-    cy.findByTestId('persistent-storage-group').contains('button.pf-v5-c-menu__item', name).click();
+    cy.findByTestId('persistent-storage-typeahead').contains(name).click();
+  }
+
+  verifyPSDropdownIsDisabled(): void {
+    cy.get('[data-testid="persistent-storage-group"] .pf-v6-c-menu-toggle')
+      .should('have.class', 'pf-m-disabled')
+      .and('have.attr', 'disabled');
+  }
+
+  verifyPSDropdownText(expectedText: string): void {
+    cy.get('[data-testid="persistent-storage-group"] .pf-v6-c-text-input-group__text-input').should(
+      'have.value',
+      expectedText,
+    );
   }
 
   findStandardPathInput() {
@@ -217,8 +248,7 @@ class AttachConnectionModal extends Modal {
   }
 
   selectConnectionOption(name: string) {
-    this.find().findByRole('button', { name: 'Connections' }).click();
-    this.find().findByRole('option', { name }).click();
+    this.find().findByRole('button', { name: 'Connections' }).findSelectOption(name).click();
     this.find().findByRole('button', { name: 'Connections' }).click();
   }
 
@@ -274,6 +304,10 @@ class CreateSpawnerPage {
 
   getNameInput() {
     return cy.findByTestId('workbench-name');
+  }
+
+  getDescriptionInput() {
+    return cy.findByTestId('workbench-description');
   }
 
   private findPVSizeField() {
@@ -354,11 +388,14 @@ class CreateSpawnerPage {
     return cy.findByTestId('existing-data-connection-type-radio');
   }
 
-  selectExistingDataConnection(name: string) {
-    cy.findByTestId('data-connection-group')
-      .findByRole('button', { name: 'Typeahead menu toggle' })
-      .click();
-    cy.get('[id="dashboard-page-main"]').findByRole('option', { name }).click();
+  findExistingDataConnectionSelect() {
+    return cy.findByTestId('existing-data-connection-select');
+  }
+
+  findExistingDataConnectionSelectValueField() {
+    return this.findExistingDataConnectionSelect().findByRole('combobox', {
+      name: 'Type to filter',
+    });
   }
 
   findAwsNameInput() {
@@ -449,7 +486,7 @@ class NotFoundSpawnerPage {
   }
 
   shouldHaveErrorMessageTitle(name: string) {
-    cy.findByTestId('error-message-title').should('have.text', name);
+    cy.findByTestId('error-message-title').should('contain.text', name);
     return this;
   }
 
@@ -461,6 +498,7 @@ class NotFoundSpawnerPage {
 export const workbenchPage = new WorkbenchPage();
 export const createSpawnerPage = new CreateSpawnerPage();
 export const notebookConfirmModal = new NotebookConfirmModal();
+export const notebookDeleteModal = new NotebookDeleteModal();
 export const editSpawnerPage = new EditSpawnerPage();
 export const storageModal = new StorageModal();
 export const notFoundSpawnerPage = new NotFoundSpawnerPage();

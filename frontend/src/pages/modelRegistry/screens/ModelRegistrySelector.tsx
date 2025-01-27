@@ -101,7 +101,8 @@ const ModelRegistrySelector: React.FC<ModelRegistrySelectorProps> = ({
         );
         onSelection(key);
       }}
-      popperProps={{ maxWidth: undefined }}
+      maxMenuHeight="300px"
+      popperProps={{ maxWidth: '400px' }}
       value={selection?.metadata.name}
       groupedOptions={[
         ...(favorites.length > 0
@@ -161,7 +162,7 @@ const ModelRegistrySelector: React.FC<ModelRegistrySelectorProps> = ({
                   <DescriptionListTerm>Description</DescriptionListTerm>
                   <DescriptionListDescription
                     className={
-                      !getDescriptionFromK8sResource(selection) ? text.disabledColor_100 : ''
+                      !getDescriptionFromK8sResource(selection) ? text.textColorDisabled : ''
                     }
                   >
                     {getDescriptionFromK8sResource(selection) || 'No description'}

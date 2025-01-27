@@ -35,7 +35,9 @@ export type AWSS3BucketDetails = {
 export type AWSS3Buckets = {
   AWS_ACCESS_KEY_ID: string;
   AWS_SECRET_ACCESS_KEY: string;
+  BUCKET_1: AWSS3BucketDetails;
   BUCKET_2: AWSS3BucketDetails;
+  BUCKET_3: AWSS3BucketDetails;
 };
 
 export type DataConnectionReplacements = {
@@ -80,6 +82,18 @@ export type PVCReplacements = {
   PVC_SIZE: string;
 };
 
+export type WBEditTestData = {
+  editTestNamespace: string;
+  editedTestNamespace: string;
+  editedTestDescription: string;
+  pvcEditDisplayName: string;
+};
+
+export type WBControlSuiteTestData = {
+  controlSuiteTestNamespace: string;
+  controlSuiteTestDescription: string;
+};
+
 export type CommandLineResult = {
   code: number;
   stdout: string;
@@ -92,6 +106,8 @@ export type TestConfig = {
   OCP_ADMIN_USER: UserAuthConfig;
   S3: AWSS3Buckets;
   APPLICATIONS_NAMESPACE: NamespaceConfig;
+  PIP_INDEX_URL: string;
+  PIP_TRUSTED_HOST: string;
 };
 
 export type DataScienceProjectData = {
@@ -100,6 +116,26 @@ export type DataScienceProjectData = {
   projectResourceName: string;
   projectPermissionResourceName: string;
   projectContributorResourceName: string;
+  projectEditName: string;
+  projectEditDescription: string;
+  projectEditResourceName: string;
+  projectEditUpdatedName: string;
+  projectSingleModelDisplayName: string;
+  projectSingleModelResourceName: string;
+  singleModelName: string;
+  modelFilePath: string;
+  projectSingleModelAdminDisplayName: string;
+  projectSingleModelAdminResourceName: string;
+  singleModelAdminName: string;
+  modelOpenVinoPath: string;
+  projectMultiModelAdminDisplayName: string;
+  projectMultiModelAdminResourceName: string;
+  multiModelAdminName: string;
+  modelOpenVinoExamplePath: string;
+};
+
+export type NotebookImageData = {
+  codeserverImageName: string;
 };
 
 export type NimServingResponse = {
@@ -125,6 +161,8 @@ export type NotebookController = {
 export type DashboardConfig = {
   dashboardConfig: {
     disableModelServing: boolean;
+    disableModelMesh: boolean;
+    disableKServe: boolean;
   };
   notebookController: NotebookController;
   [key: string]: unknown;
@@ -139,6 +177,12 @@ export type NotebookControllerConfig = {
   ISTIO_GATEWAY: string;
   ISTIO_HOST: string;
   USE_ISTIO: string;
+};
+
+export type NotebookControllerCullerConfig = {
+  CULL_IDLE_TIME: string;
+  ENABLE_CULLING: string;
+  IDLENESS_CHECK_PERIOD: string;
 };
 
 export type ResourceData = {
@@ -158,6 +202,7 @@ export type ResourcesData = {
     CustomTutorial: ResourceData[];
   };
 };
+
 export type NamespaceConfig = {
   APPLICATIONS_NAMESPACE: string;
 };

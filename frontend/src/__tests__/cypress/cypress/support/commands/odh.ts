@@ -10,27 +10,31 @@ import type {
   RegisteredModelList,
 } from '~/concepts/modelRegistry/types';
 import type {
+  ConfigMapKind,
+  ConsoleLinkKind,
   DashboardConfigKind,
   DataScienceClusterInitializationKindStatus,
   DataScienceClusterKindStatus,
+  ListConfigSecretsResponse,
+  ModelRegistryKind,
+  NotebookKind,
   OdhQuickStart,
   RoleBindingKind,
+  SecretKind,
   ServingRuntimeKind,
   TemplateKind,
-  NotebookKind,
-  ModelRegistryKind,
-  ConsoleLinkKind,
 } from '~/k8sTypes';
 
 import type { StartNotebookData } from '~/pages/projects/types';
 import type { AllowedUser } from '~/pages/notebookController/screens/admin/types';
-import type { GroupsConfig } from '~/pages/groupSettings/groupTypes';
+import type { GroupsConfig } from '~/concepts/userConfigs/groupTypes';
 import type { StatusResponse } from '~/redux/types';
 import type {
   BYONImage,
   ClusterSettingsType,
   DetectedAccelerators,
   ImageInfo,
+  IntegrationAppStatus,
   OdhApplication,
   OdhDocument,
   PrometheusQueryRangeResponse,
@@ -76,10 +80,11 @@ type Options = { path?: Replacement; query?: Query; times?: number } | null;
 declare global {
   namespace Cypress {
     interface Chainable {
-      interceptOdh: ((
-        type: 'POST /api/accelerator-profiles',
-        response?: OdhResponse,
-      ) => Cypress.Chainable<null>) &
+      interceptOdh: ((type: 'GET /oauth/sign_out') => Cypress.Chainable<null>) &
+        ((
+          type: 'POST /api/accelerator-profiles',
+          response?: OdhResponse,
+        ) => Cypress.Chainable<null>) &
         ((
           type: 'DELETE /api/accelerator-profiles/:name',
           options: { path: { name: string } },
@@ -342,9 +347,7 @@ declare global {
         ) => Cypress.Chainable<null>) &
         ((
           type: 'GET /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/model_versions/:modelVersionId',
-          options: {
-            path: { serviceName: string; apiVersion: string; modelVersionId: number };
-          },
+          options: { path: { serviceName: string; apiVersion: string; modelVersionId: number } },
           response: OdhResponse<ModelVersion>,
         ) => Cypress.Chainable<null>) &
         ((
@@ -365,6 +368,17 @@ declare global {
         ((
           type: 'GET /api/modelRegistries',
           response: OdhResponse<K8sResourceListResult<ModelRegistryKind>>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'POST /api/modelRegistries',
+          response: OdhResponse<ModelRegistryKind>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'PATCH /api/modelRegistries/:modelRegistryName',
+          options: {
+            path: { modelRegistryName: string };
+          },
+          response: OdhResponse<{ modelRegistry: ModelRegistryKind; databasePassword?: string }>,
         ) => Cypress.Chainable<null>) &
         ((
           type: 'GET /api/modelRegistries/:modelRegistryName',
@@ -602,6 +616,20 @@ declare global {
           response: OdhResponse<{ notebook: NotebookKind; isRunning: boolean }>,
         ) => Cypress.Chainable<null>) &
         ((
+          type: 'GET /api/envs/configmap/openshift-ai-notebooks/:filename',
+          options: {
+            path: { filename: string };
+          },
+          response: OdhResponse<ConfigMapKind>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'GET /api/envs/secret/openshift-ai-notebooks/:filename',
+          options: {
+            path: { filename: string };
+          },
+          response: OdhResponse<SecretKind>,
+        ) => Cypress.Chainable<null>) &
+        ((
           type: 'GET /api/service/pipelines/:namespace/:serviceName/apis/v2beta1/artifacts/:artifactId',
           options: {
             query: { view: string };
@@ -630,6 +658,10 @@ declare global {
         ((
           type: 'GET /api/connection-types',
           response: ConnectionTypeConfigMap[],
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'GET /api/modelRegistryCertificates',
+          response: OdhResponse<ListConfigSecretsResponse>,
         ) => Cypress.Chainable<null>) &
         ((
           type: 'POST /api/connection-types',
@@ -675,10 +707,56 @@ declare global {
           type: 'GET /api/nim-serving/:resource',
           options: {
             path: {
-              resource: 'nvidia-nim-images-data' | 'nvidia-nim-access' | 'nvidia-nim-image-pull';
+              resource: string;
             };
           },
           response: OdhResponse<NimServingResponse>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'GET /api/integrations/:internalRoute',
+          options: {
+            path: {
+              internalRoute: string;
+            };
+          },
+          response: OdhResponse<IntegrationAppStatus>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'PATCH /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/registered_models/:registeredModelId',
+          options: {
+            path: {
+              serviceName: string;
+              apiVersion: string;
+              registeredModelId: string | number;
+            };
+          },
+          response: OdhResponse<RegisteredModel>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: string,
+          options: {
+            method: 'GET';
+            path: {
+              serviceName: string;
+              apiVersion: string;
+              modelVersionId: string;
+            };
+          },
+          response: OdhResponse<ModelVersion>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'POST /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/model_versions/:modelVersionId/artifacts',
+          options: {
+            path: { serviceName: string; apiVersion: string; modelVersionId: string };
+          },
+          response: OdhResponse<ModelArtifact>,
+        ) => Cypress.Chainable<null>) &
+        ((
+          type: 'PATCH /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/model_versions/:modelVersionId',
+          options: {
+            path: { serviceName: string; apiVersion: string; modelVersionId: string };
+          },
+          response: OdhResponse<ModelVersion>,
         ) => Cypress.Chainable<null>);
     }
   }

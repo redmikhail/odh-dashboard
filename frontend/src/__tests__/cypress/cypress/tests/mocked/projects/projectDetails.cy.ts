@@ -22,22 +22,25 @@ import { ServingRuntimePlatform } from '~/types';
 import {
   DataSciencePipelineApplicationModel,
   ImageStreamModel,
+  InferenceServiceModel,
+  NIMAccountModel,
   NotebookModel,
-  PVCModel,
   PodModel,
   ProjectModel,
+  PVCModel,
   RouteModel,
   SecretModel,
   ServiceAccountModel,
-  TemplateModel,
-  InferenceServiceModel,
   ServingRuntimeModel,
+  TemplateModel,
 } from '~/__tests__/cypress/cypress/utils/models';
 import { mockServingRuntimeK8sResource } from '~/__mocks__/mockServingRuntimeK8sResource';
 import { mockInferenceServiceK8sResource } from '~/__mocks__/mockInferenceServiceK8sResource';
 import { asProjectAdminUser } from '~/__tests__/cypress/cypress/utils/mockUsers';
 import { NamespaceApplicationCase } from '~/pages/projects/types';
 import { mockNimServingRuntimeTemplate } from '~/__mocks__/mockNimResource';
+import { mockNimAccount } from '~/__mocks__/mockNimAccount';
+import { mockOdhApplication } from '~/__mocks__/mockOdhApplication';
 
 type HandlersProps = {
   isEmpty?: boolean;
@@ -271,6 +274,19 @@ const initIntercepts = ({
     },
     buildMockPipelines(isEmpty ? [] : [mockPipelineKF({})]),
   );
+
+  cy.interceptOdh('GET /api/components', null, [mockOdhApplication({})]);
+  cy.interceptOdh(
+    'GET /api/integrations/:internalRoute',
+    { path: { internalRoute: 'nim' } },
+    {
+      isInstalled: true,
+      isEnabled: true,
+      canInstall: false,
+      error: '',
+    },
+  );
+  cy.interceptK8sList(NIMAccountModel, mockK8sResourceList([mockNimAccount({})]));
 };
 
 describe('Project Details', () => {

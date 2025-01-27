@@ -1,7 +1,14 @@
-import _ from 'lodash-es';
+import * as _ from 'lodash-es';
 import { KnownLabels, NotebookKind } from '~/k8sTypes';
 import { DEFAULT_NOTEBOOK_SIZES } from '~/pages/projects/screens/spawner/const';
-import { ContainerResources, TolerationEffect, TolerationOperator, VolumeMount } from '~/types';
+import {
+  ContainerResources,
+  EnvironmentVariable,
+  TolerationEffect,
+  TolerationOperator,
+  Volume,
+  VolumeMount,
+} from '~/types';
 import { genUID } from '~/__mocks__/mockUtils';
 import { RecursivePartial } from '~/typeHelpers';
 import { EnvironmentFromVariable } from '~/pages/projects/types';
@@ -13,12 +20,14 @@ type MockResourceConfigType = {
   user?: string;
   description?: string;
   envFrom?: EnvironmentFromVariable[];
+  additionalEnvs?: EnvironmentVariable[];
   resources?: ContainerResources;
   image?: string;
   lastImageSelection?: string;
   opts?: RecursivePartial<NotebookKind>;
   uid?: string;
   additionalVolumeMounts?: VolumeMount[];
+  additionalVolumes?: Volume[];
 };
 
 export const mockNotebookK8sResource = ({
@@ -31,7 +40,7 @@ export const mockNotebookK8sResource = ({
       },
     },
   ],
-
+  additionalEnvs = [],
   namespace = 'test-project',
   user = 'test-user',
   description = '',
@@ -41,6 +50,7 @@ export const mockNotebookK8sResource = ({
   opts = {},
   uid = genUID('notebook'),
   additionalVolumeMounts = [],
+  additionalVolumes = [],
 }: MockResourceConfigType): NotebookKind =>
   _.merge(
     {
@@ -106,6 +116,7 @@ export const mockNotebookK8sResource = ({
                     value:
                       'image-registry.openshift-image-registry.svc:5000/opendatahub/code-server-notebook:2023.2',
                   },
+                  ...additionalEnvs,
                 ],
                 envFrom,
                 image,
@@ -257,6 +268,7 @@ export const mockNotebookK8sResource = ({
                   secretName: 'workbench-tls',
                 },
               },
+              ...additionalVolumes,
             ],
           },
         },
