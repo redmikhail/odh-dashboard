@@ -5,6 +5,7 @@ import {
   StackItem,
   Timestamp,
   TimestampTooltipVariant,
+  Truncate,
 } from '@patternfly/react-core';
 import { ActionsColumn, ExpandableRowContent, Tbody, Td, Tr } from '@patternfly/react-table';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +17,8 @@ import NodeResourceTable from '~/pages/hardwareProfiles/nodeResource/NodeResourc
 import NodeSelectorTable from '~/pages/hardwareProfiles/nodeSelector/NodeSelectorTable';
 import TolerationTable from '~/pages/hardwareProfiles/toleration/TolerationTable';
 import { isHardwareProfileOOTB } from '~/pages/hardwareProfiles/utils';
+import { HardwareProfileModel } from '~/api';
+import { useKebabAccessAllowed, verbModelAccess } from '~/concepts/userSSAR';
 
 type HardwareProfilesTableRowProps = {
   rowIndex: number;
@@ -47,9 +50,11 @@ const HardwareProfilesTableRow: React.FC<HardwareProfilesTableRowProps> = ({
         />
         <Td dataLabel="Name">
           <TableRowTitleDescription
-            title={hardwareProfile.spec.displayName}
+            title={<Truncate content={hardwareProfile.spec.displayName} />}
             description={hardwareProfile.spec.description}
+            resource={hardwareProfile}
             truncateDescriptionLines={2}
+            wrapResourceTitle={false}
           />
         </Td>
         <Td dataLabel="Enabled">
@@ -75,29 +80,40 @@ const HardwareProfilesTableRow: React.FC<HardwareProfilesTableRowProps> = ({
         <Td isActionCell>
           <ActionsColumn
             items={[
-              ...(isHardwareProfileOOTB(hardwareProfile)
-                ? []
-                : [
-                    {
-                      title: 'Edit',
-                      onClick: () =>
-                        navigate(`/hardwareProfiles/edit/${hardwareProfile.metadata.name}`),
-                    },
-                  ]),
-              {
-                title: 'Duplicate',
-                onClick: () =>
-                  navigate(`/hardwareProfiles/duplicate/${hardwareProfile.metadata.name}`),
-              },
-              ...(isHardwareProfileOOTB(hardwareProfile)
-                ? []
-                : [
-                    { isSeparator: true },
-                    {
-                      title: 'Delete',
-                      onClick: () => handleDelete(hardwareProfile),
-                    },
-                  ]),
+              ...useKebabAccessAllowed(
+                isHardwareProfileOOTB(hardwareProfile)
+                  ? []
+                  : [
+                      {
+                        title: 'Edit',
+                        onClick: () =>
+                          navigate(`/hardwareProfiles/edit/${hardwareProfile.metadata.name}`),
+                      },
+                    ],
+                verbModelAccess('update', HardwareProfileModel),
+              ),
+              ...useKebabAccessAllowed(
+                [
+                  {
+                    title: 'Duplicate',
+                    onClick: () =>
+                      navigate(`/hardwareProfiles/duplicate/${hardwareProfile.metadata.name}`),
+                  },
+                ],
+                verbModelAccess('create', HardwareProfileModel),
+              ),
+              ...useKebabAccessAllowed(
+                isHardwareProfileOOTB(hardwareProfile)
+                  ? []
+                  : [
+                      { isSeparator: true },
+                      {
+                        title: 'Delete',
+                        onClick: () => handleDelete(hardwareProfile),
+                      },
+                    ],
+                verbModelAccess('delete', HardwareProfileModel),
+              ),
             ]}
           />
         </Td>
