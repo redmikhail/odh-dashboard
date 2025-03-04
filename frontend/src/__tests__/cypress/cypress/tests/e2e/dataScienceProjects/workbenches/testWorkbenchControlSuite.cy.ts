@@ -1,5 +1,5 @@
 import type { WBControlSuiteTestData } from '~/__tests__/cypress/cypress/types';
-import { projectDetails, projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
+import { projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
 import {
   workbenchPage,
   createSpawnerPage,
@@ -11,13 +11,17 @@ import { HTPASSWD_CLUSTER_ADMIN_USER } from '~/__tests__/cypress/cypress/utils/e
 import { loadWBControlSuiteFixture } from '~/__tests__/cypress/cypress/utils/dataLoader';
 import { createCleanProject } from '~/__tests__/cypress/cypress/utils/projectChecker';
 import { deleteOpenShiftProject } from '~/__tests__/cypress/cypress/utils/oc_commands/project';
+import {
+  retryableBefore,
+  wasSetupPerformed,
+} from '~/__tests__/cypress/cypress/utils/retryableHooks';
 
 describe('Start, Stop, Launch and Delete a Workbench in RHOAI', () => {
   let controlSuiteTestNamespace: string;
   let controlSuiteTestDescription: string;
 
   // Setup: Load test data and ensure clean state
-  before(() => {
+  retryableBefore(() => {
     return loadWBControlSuiteFixture('e2e/dataScienceProjects/testWorkbenchControlSuite.yaml')
       .then((fixtureData: WBControlSuiteTestData) => {
         controlSuiteTestNamespace = fixtureData.controlSuiteTestNamespace;
@@ -36,6 +40,9 @@ describe('Start, Stop, Launch and Delete a Workbench in RHOAI', () => {
       });
   });
   after(() => {
+    //Check if the Before Method was executed to perform the setup
+    if (!wasSetupPerformed()) return;
+
     // Delete provisioned Project
     if (controlSuiteTestNamespace) {
       cy.log(`Deleting Project ${controlSuiteTestNamespace} after the test has finished.`);
@@ -45,7 +52,17 @@ describe('Start, Stop, Launch and Delete a Workbench in RHOAI', () => {
 
   it(
     'Starting, Stopping, Launching and Deleting a Workbench',
-    { tags: ['@Sanity', '@SanitySet2', '@ODS-1818', '@ODS-1823', '@ODS-1975', '@Dashboard'] },
+    {
+      tags: [
+        '@Sanity',
+        '@SanitySet2',
+        '@ODS-1818',
+        '@ODS-1823',
+        '@ODS-1975',
+        '@Dashboard',
+        '@Workbenches',
+      ],
+    },
     () => {
       const workbenchName = controlSuiteTestNamespace.replace('dsp-', '');
 
@@ -58,7 +75,9 @@ describe('Start, Stop, Launch and Delete a Workbench in RHOAI', () => {
       projectListPage.navigate();
       projectListPage.filterProjectByName(controlSuiteTestNamespace);
       projectListPage.findProjectLink(controlSuiteTestNamespace).click();
-      projectDetails.findSectionTab('workbenches').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('workbenches').click();
+      cy.visit(`projects/${controlSuiteTestNamespace}?section=workbenches`);
 
       // Create workbench
       cy.step(`Create workbench ${controlSuiteTestNamespace}`);
@@ -99,7 +118,17 @@ describe('Start, Stop, Launch and Delete a Workbench in RHOAI', () => {
   );
   it(
     'Verify that a Workbench can be started and stopped using the Event log controls',
-    { tags: ['@Sanity', '@SanitySet2', '@ODS-1818', '@ODS-1823', '@ODS-1975', '@Dashboard'] },
+    {
+      tags: [
+        '@Sanity',
+        '@SanitySet2',
+        '@ODS-1818',
+        '@ODS-1823',
+        '@ODS-1975',
+        '@Dashboard',
+        '@Workbenches',
+      ],
+    },
     () => {
       const workbenchName = controlSuiteTestNamespace.replace('dsp-', 'secondwb-');
 
@@ -111,7 +140,9 @@ describe('Start, Stop, Launch and Delete a Workbench in RHOAI', () => {
       projectListPage.navigate();
       projectListPage.filterProjectByName(controlSuiteTestNamespace);
       projectListPage.findProjectLink(controlSuiteTestNamespace).click();
-      projectDetails.findSectionTab('workbenches').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('workbenches').click();
+      cy.visit(`projects/${controlSuiteTestNamespace}?section=workbenches`);
 
       // Create workbench
       cy.step(`Create workbench ${controlSuiteTestNamespace}`);

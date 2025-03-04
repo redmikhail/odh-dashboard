@@ -193,4 +193,87 @@ describe('Connections', () => {
       });
     });
   });
+
+  it('Create an OCI connection', () => {
+    initIntercepts();
+    cy.interceptOdh('GET /api/connection-types', [
+      mockConnectionTypeConfigMap({
+        name: 'oci-v1',
+        displayName: 'OCI compliant registry - v1',
+        fields: [
+          {
+            name: 'Access type',
+            type: ConnectionTypeFieldType.Dropdown,
+            envVar: 'ACCESS_TYPE',
+            required: false,
+            properties: {
+              variant: 'multi',
+              items: [
+                { label: 'Push secret', value: 'Push' },
+                { label: 'Pull secret', value: 'Pull' },
+              ],
+            },
+          },
+          {
+            name: 'Secret details',
+            type: ConnectionTypeFieldType.File,
+            envVar: '.dockerconfigjson',
+            required: true,
+            properties: { extensions: ['.dockerconfigjson, .json'] },
+          },
+          {
+            name: 'Base URL / Registry URI',
+            type: ConnectionTypeFieldType.ShortText,
+            envVar: 'OCI_HOST',
+            required: true,
+            properties: {},
+          },
+        ],
+      }),
+    ]);
+    cy.interceptK8s(
+      'POST',
+      {
+        model: SecretModel,
+        ns: 'test-project',
+      },
+      mockSecretK8sResource({}),
+    ).as('createConnection');
+
+    projectDetails.visitSection('test-project', 'connections');
+
+    connectionsPage.findAddConnectionButton().click();
+    cy.findByTestId('connection-name-desc-name').fill('new oci connection');
+    cy.findByTestId(['field', 'OCI_HOST']).fill('quay.io/myorg');
+    cy.get('input[type="file"]').selectFile(
+      {
+        contents: Cypress.Buffer.from('{"auths":{"quay.io":{"token":"asdf"}}}}'),
+        fileName: '.dockerconfigjson',
+      },
+      { force: true, action: 'drag-drop' },
+    );
+    cy.findByTestId('modal-submit-button').click();
+
+    cy.wait('@createConnection').then((interception) => {
+      expect(interception.request.body).to.eql({
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name: 'new-oci-connection',
+          namespace: 'test-project',
+          labels: { 'opendatahub.io/dashboard': 'true' },
+          annotations: {
+            'openshift.io/display-name': 'new oci connection',
+            'openshift.io/description': '',
+            'opendatahub.io/connection-type-ref': 'oci-v1',
+          },
+        },
+        stringData: {
+          OCI_HOST: 'quay.io/myorg',
+          '.dockerconfigjson': '{"auths":{"quay.io":{"token":"asdf"}}}}',
+        },
+        type: 'kubernetes.io/dockerconfigjson',
+      });
+    });
+  });
 });

@@ -21,10 +21,21 @@ export const mockDsc = ({
     components: {
       datasciencepipelines: {
         managementState: 'Managed',
-        managedPipelines: {
-          instructLab: {
-            state: 'Managed',
+      },
+      kserve: {
+        defaultDeploymentMode: 'Severless',
+        managementState: 'Managed',
+        nim: {
+          managementState: 'Managed',
+        },
+        serving: {
+          ingressGateway: {
+            certificate: {
+              type: 'OpenshiftDefaultIngress',
+            },
           },
+          managementState: 'Managed',
+          name: 'knative-serving',
         },
       },
     },

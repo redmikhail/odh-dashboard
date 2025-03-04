@@ -1,5 +1,5 @@
 import type { WBStatusTestData } from '~/__tests__/cypress/cypress/types';
-import { projectDetails, projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
+import { projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
 import {
   workbenchPage,
   createSpawnerPage,
@@ -9,13 +9,17 @@ import { HTPASSWD_CLUSTER_ADMIN_USER } from '~/__tests__/cypress/cypress/utils/e
 import { loadWBStatusFixture } from '~/__tests__/cypress/cypress/utils/dataLoader';
 import { createCleanProject } from '~/__tests__/cypress/cypress/utils/projectChecker';
 import { deleteOpenShiftProject } from '~/__tests__/cypress/cypress/utils/oc_commands/project';
+import {
+  retryableBefore,
+  wasSetupPerformed,
+} from '~/__tests__/cypress/cypress/utils/retryableHooks';
 
 describe('Workbenches - status tests', () => {
   let projectName: string;
   let projectDescription: string;
 
   // Setup: Load test data and ensure clean state
-  before(() => {
+  retryableBefore(() => {
     return loadWBStatusFixture('e2e/dataScienceProjects/testWorkbenchStatus.yaml')
       .then((fixtureData: WBStatusTestData) => {
         projectName = fixtureData.wbStatusTestNamespace;
@@ -33,6 +37,9 @@ describe('Workbenches - status tests', () => {
   });
 
   after(() => {
+    //Check if the Before Method was executed to perform the setup
+    if (!wasSetupPerformed()) return;
+
     // Delete provisioned Project
     if (projectName) {
       cy.log(`Deleting Project ${projectName} after the test has finished.`);
@@ -42,7 +49,7 @@ describe('Workbenches - status tests', () => {
 
   it(
     'Verify user can access progress and event log - validate status and successful workbench creation',
-    { tags: ['@Sanity', '@SanitySet2', '@ODS-1970', '@Dashboard'] },
+    { tags: ['@Sanity', '@SanitySet2', '@ODS-1970', '@Dashboard', '@Workbenches'] },
     () => {
       const workbenchName = projectName.replace('dsp-', '');
 
@@ -55,7 +62,9 @@ describe('Workbenches - status tests', () => {
       projectListPage.navigate();
       projectListPage.filterProjectByName(projectName);
       projectListPage.findProjectLink(projectName).click();
-      projectDetails.findSectionTab('workbenches').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('workbenches').click();
+      cy.visit(`projects/${projectName}?section=workbenches`);
 
       // Create workbench
       cy.step(`Create workbench ${workbenchName}`);

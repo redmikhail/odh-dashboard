@@ -1,5 +1,5 @@
 import { HTPASSWD_CLUSTER_ADMIN_USER } from '~/__tests__/cypress/cypress/utils/e2eUsers';
-import { projectListPage, projectDetails } from '~/__tests__/cypress/cypress/pages/projects';
+import { projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
 import { deleteOpenShiftProject } from '~/__tests__/cypress/cypress/utils/oc_commands/project';
 import type { DataScienceProjectData, AWSS3BucketDetails } from '~/__tests__/cypress/cypress/types';
 import { connectionsPage, addConnectionModal } from '~/__tests__/cypress/cypress/pages/connections';
@@ -7,6 +7,10 @@ import { loadDSPFixture } from '~/__tests__/cypress/cypress/utils/dataLoader';
 import { createCleanProject } from '~/__tests__/cypress/cypress/utils/projectChecker';
 import { deleteModal } from '~/__tests__/cypress/cypress/pages/components/DeleteModal';
 import { AWS_BUCKETS } from '~/__tests__/cypress/cypress/utils/s3Buckets';
+import {
+  retryableBefore,
+  wasSetupPerformed,
+} from '~/__tests__/cypress/cypress/utils/retryableHooks';
 
 describe('Verify Data Connections - Creation and Deletion', () => {
   let testData: DataScienceProjectData;
@@ -16,7 +20,7 @@ describe('Verify Data Connections - Creation and Deletion', () => {
   let s3SecretKey: string;
 
   // Setup: Load test data and ensure clean state
-  before(() => {
+  retryableBefore(() => {
     const bucketKey = 'BUCKET_1' as const;
     const bucketConfig = AWS_BUCKETS[bucketKey];
 
@@ -46,6 +50,9 @@ describe('Verify Data Connections - Creation and Deletion', () => {
       });
   });
   after(() => {
+    //Check if the Before Method was executed to perform the setup
+    if (!wasSetupPerformed()) return;
+
     // Delete provisioned Project
     if (projectName) {
       cy.log(`Deleting Project ${projectName} after the test has finished.`);
@@ -69,7 +76,9 @@ describe('Verify Data Connections - Creation and Deletion', () => {
 
       //Navigate to Data Connections and create Connection
       cy.step('Navigate to Connections and click to create Connection');
-      projectDetails.findSectionTab('connections').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('connections').click();
+      cy.visit(`projects/${projectName}?section=connections`);
       connectionsPage.findCreateConnectionButton().click();
 
       // Enter validate Data Connection details into the Data Connection Modal

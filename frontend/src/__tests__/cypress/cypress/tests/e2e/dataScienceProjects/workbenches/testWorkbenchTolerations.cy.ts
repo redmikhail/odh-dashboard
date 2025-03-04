@@ -1,5 +1,5 @@
 import type { WBTolerationsTestData } from '~/__tests__/cypress/cypress/types';
-import { projectDetails, projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
+import { projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
 import {
   workbenchPage,
   createSpawnerPage,
@@ -20,15 +20,19 @@ import {
   restoreTolerationSettings,
   disableTolerationsWithRetry,
 } from '~/__tests__/cypress/cypress/utils/clusterSettingsUtils';
+import {
+  retryableBefore,
+  wasSetupPerformed,
+} from '~/__tests__/cypress/cypress/utils/retryableHooks';
 
-describe('Workbenches - tolerations tests', () => {
+describe('[Automation Bug: RHOAIENG-20099] Workbenches - tolerations tests', () => {
   let testData: WBTolerationsTestData;
   let projectName: string;
   let projectDescription: string;
   let initialState: { isChecked: boolean; tolerationValue: string };
 
   // Setup: Load test data and ensure clean state
-  before(() => {
+  retryableBefore(() => {
     return loadWBTolerationsFixture('e2e/dataScienceProjects/testWorkbenchTolerations.yaml')
       .then((fixtureData: WBTolerationsTestData) => {
         projectName = fixtureData.wbTolerationsTestNamespace;
@@ -48,6 +52,9 @@ describe('Workbenches - tolerations tests', () => {
 
   // Cleanup: Restore original toleration settings and delete the created project
   after(() => {
+    //Check if the Before Method was executed to perform the setup
+    if (!wasSetupPerformed()) return;
+
     // Restore original toleration settings
     clusterSettings.visit();
     cy.log('Restoring Original toleration settings restored');
@@ -63,7 +70,7 @@ describe('Workbenches - tolerations tests', () => {
 
   it(
     'Validate pod tolerations are applied to a Workbench',
-    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard'] },
+    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard', '@Bug'] },
     () => {
       // Authentication and navigation
       cy.step('Log into the application');
@@ -89,7 +96,9 @@ describe('Workbenches - tolerations tests', () => {
       projectListPage.navigate();
       projectListPage.filterProjectByName(projectName);
       projectListPage.findProjectLink(projectName).click();
-      projectDetails.findSectionTab('workbenches').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('workbenches').click();
+      cy.visit(`projects/${projectName}?section=workbenches`);
 
       // Create workbench and verify it starts running
       cy.step(`Create workbench ${testData.workbenchName}`);
@@ -123,7 +132,7 @@ describe('Workbenches - tolerations tests', () => {
 
   it(
     'Validate pod tolerations for a stopped workbench',
-    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard'] },
+    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard', '@Bug'] },
     () => {
       // Authentication and navigation
       cy.step('Log into the application');
@@ -134,7 +143,9 @@ describe('Workbenches - tolerations tests', () => {
       projectListPage.navigate();
       projectListPage.filterProjectByName(projectName);
       projectListPage.findProjectLink(projectName).click();
-      projectDetails.findSectionTab('workbenches').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('workbenches').click();
+      cy.visit(`projects/${projectName}?section=workbenches`);
 
       // Stop workbench and verify it stops running
       cy.step(`Stop workbench ${testData.workbenchName}`);
@@ -156,7 +167,7 @@ describe('Workbenches - tolerations tests', () => {
 
   it(
     'Validate pod tolerations when a workbench is restarted with tolerations and tolerations are disabled',
-    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard'] },
+    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard', '@Bug'] },
     () => {
       // Authentication and navigation
       cy.step('Log into the application');
@@ -173,7 +184,9 @@ describe('Workbenches - tolerations tests', () => {
       projectListPage.navigate();
       projectListPage.filterProjectByName(projectName);
       projectListPage.findProjectLink(projectName).click();
-      projectDetails.findSectionTab('workbenches').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('workbenches').click();
+      cy.visit(`projects/${projectName}?section=workbenches`);
 
       // Stop workbench and verify it stops running
       cy.step(`Restart workbench ${testData.workbenchName} and validate it has been started`);
@@ -194,7 +207,7 @@ describe('Workbenches - tolerations tests', () => {
 
   it(
     'Verifies that a new toleration is added to a new workbench but not to an already running workbench',
-    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard'] },
+    { tags: ['@Sanity', '@SanitySet2', '@ODS-1969', '@ODS-2057', '@Dashboard', '@Bug'] },
     () => {
       // Set Pod Tolerations
       cy.step('Navigate to Cluster Settings, save and set pod tolerations');
@@ -210,7 +223,9 @@ describe('Workbenches - tolerations tests', () => {
       projectListPage.navigate();
       projectListPage.filterProjectByName(projectName);
       projectListPage.findProjectLink(projectName).click();
-      projectDetails.findSectionTab('workbenches').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('workbenches').click();
+      cy.visit(`projects/${projectName}?section=workbenches`);
 
       // Create a second workbench with Config Map variables by uploading a yaml file
       cy.step(`Create a second workbench ${testData.workbenchName2} using config map variables`);

@@ -24,7 +24,6 @@ import {
 } from '~/pages/modelServing/utils';
 import useCustomServingRuntimesEnabled from '~/pages/modelServing/customServingRuntimes/useCustomServingRuntimesEnabled';
 import { getServingRuntimeFromName } from '~/pages/modelServing/customServingRuntimes/utils';
-import useServingAcceleratorProfileFormState from '~/pages/modelServing/screens/projects/useServingAcceleratorProfileFormState';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 import {
   InferenceServiceStorageType,
@@ -33,7 +32,7 @@ import {
 import ServingRuntimeSizeSection from '~/pages/modelServing/screens/projects/ServingRuntimeModal/ServingRuntimeSizeSection';
 import ServingRuntimeTemplateSection from '~/pages/modelServing/screens/projects/ServingRuntimeModal/ServingRuntimeTemplateSection';
 import ProjectSection from '~/pages/modelServing/screens/projects/InferenceServiceModal/ProjectSection';
-import { DataConnection, NamespaceApplicationCase } from '~/pages/projects/types';
+import { NamespaceApplicationCase } from '~/pages/projects/types';
 import InferenceServiceFrameworkSection from '~/pages/modelServing/screens/projects/InferenceServiceModal/InferenceServiceFrameworkSection';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
 import AuthServingRuntimeSection from '~/pages/modelServing/screens/projects/ServingRuntimeModal/AuthServingRuntimeSection';
@@ -51,7 +50,10 @@ import K8sNameDescriptionField, {
   useK8sNameDescriptionFieldData,
 } from '~/concepts/k8s/K8sNameDescriptionField/K8sNameDescriptionField';
 import { isK8sNameDescriptionDataValid } from '~/concepts/k8s/K8sNameDescriptionField/utils';
+import { useProfileIdentifiers } from '~/concepts/hardwareProfiles/utils';
+import { useModelServingPodSpecOptionsState } from '~/concepts/hardwareProfiles/useModelServingPodSpecOptionsState';
 import { validateEnvVarName } from '~/concepts/connectionTypes/utils';
+import usePrefillDeployModalFromModelRegistry from '~/pages/modelRegistry/screens/RegisteredModels/usePrefillDeployModalFromModelRegistry';
 import { useKServeDeploymentMode } from '~/pages/modelServing/useKServeDeploymentMode';
 import KServeAutoscalerReplicaSection from './KServeAutoscalerReplicaSection';
 import EnvironmentVariablesSection from './EnvironmentVariablesSection';
@@ -75,7 +77,7 @@ type ManageKServeModalProps = {
   {
     projectContext?: {
       currentProject: ProjectKind;
-      dataConnections: DataConnection[];
+      connections: Connection[];
     };
   },
   {
@@ -98,14 +100,19 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
 }) => {
   const { isRawAvailable, isServerlessAvailable } = useKServeDeploymentMode();
 
-  const [createDataServingRuntime, setCreateDataServingRuntime, , sizes] =
-    useCreateServingRuntimeObject(editInfo?.servingRuntimeEditInfo);
+  const [createDataServingRuntime, setCreateDataServingRuntime] = useCreateServingRuntimeObject(
+    editInfo?.servingRuntimeEditInfo,
+  );
   const [createDataInferenceService, setCreateDataInferenceService] =
     useCreateInferenceServiceObject(
       editInfo?.inferenceServiceEditInfo,
       editInfo?.servingRuntimeEditInfo?.servingRuntime,
       editInfo?.secrets,
     );
+  const podSpecOptionsState = useModelServingPodSpecOptionsState(
+    editInfo?.servingRuntimeEditInfo?.servingRuntime,
+    editInfo?.inferenceServiceEditInfo,
+  );
   const { data: kServeNameDesc, onDataChange: setKserveNameDesc } = useK8sNameDescriptionFieldData({
     initialData: editInfo?.inferenceServiceEditInfo,
   });
@@ -119,20 +126,24 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
   const currentProjectName = projectContext?.currentProject.metadata.name;
   const namespace = currentProjectName || createDataInferenceService.project;
 
-  const {
-    initialState: initialAcceleratorProfileState,
-    formData: selectedAcceleratorProfile,
-    setFormData: setSelectedAcceleratorProfile,
-  } = useServingAcceleratorProfileFormState(
-    editInfo?.servingRuntimeEditInfo?.servingRuntime,
-    editInfo?.inferenceServiceEditInfo,
-  );
-
   const customServingRuntimesEnabled = useCustomServingRuntimesEnabled();
   const [allowCreate] = useAccessReview({
     ...accessReviewResource,
     namespace,
   });
+
+  const profileIdentifiers = useProfileIdentifiers(
+    podSpecOptionsState.acceleratorProfile.formData.profile,
+    podSpecOptionsState.hardwareProfile.formData.selectedProfile,
+  );
+
+  const [connections, connectionsLoaded, connectionsLoadError] =
+    usePrefillDeployModalFromModelRegistry(
+      projectContext,
+      createDataInferenceService,
+      setCreateDataInferenceService,
+      registeredModelDeployInfo,
+    );
 
   const [actionInProgress, setActionInProgress] = React.useState(false);
   const [error, setError] = React.useState<Error | undefined>();
@@ -176,8 +187,8 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
 
   const baseInputValueValid =
     createDataInferenceService.maxReplicas >= 0 &&
-    resourcesArePositive(createDataInferenceService.modelSize.resources) &&
-    requestsUnderLimits(createDataInferenceService.modelSize.resources);
+    resourcesArePositive(podSpecOptionsState.podSpecOptions.resources) &&
+    requestsUnderLimits(podSpecOptionsState.podSpecOptions.resources);
 
   const isDisabledInferenceService = () =>
     !isK8sNameDescriptionDataValid(kServeNameDesc) ||
@@ -187,7 +198,8 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
     !baseInputValueValid ||
     createDataInferenceService.servingRuntimeEnvVars?.some(
       (envVar) => !envVar.name || !!validateEnvVarName(envVar.name),
-    );
+    ) ||
+    !podSpecOptionsState.hardwareProfile.isFormDataValid;
 
   const servingRuntimeSelected = React.useMemo(
     () =>
@@ -234,8 +246,7 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
       namespace,
       editInfo?.servingRuntimeEditInfo,
       false,
-      initialAcceleratorProfileState,
-      selectedAcceleratorProfile,
+      podSpecOptionsState.podSpecOptions,
       NamespaceApplicationCase.KSERVE_PROMOTION,
       projectContext?.currentProject,
       servingRuntimeName,
@@ -253,8 +264,7 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
       servingRuntimeName,
       inferenceServiceName,
       false,
-      initialAcceleratorProfileState,
-      selectedAcceleratorProfile,
+      podSpecOptionsState.podSpecOptions,
       allowCreate,
       editInfo?.secrets,
       undefined,
@@ -355,7 +365,7 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
                 setData={setCreateDataServingRuntime}
                 templates={servingRuntimeTemplates || []}
                 isEditing={!!editInfo}
-                selectedAcceleratorProfile={selectedAcceleratorProfile}
+                compatibleIdentifiers={profileIdentifiers}
                 resetModelFormat={() => setCreateDataInferenceService('format', { name: '' })}
               />
               <InferenceServiceFrameworkSection
@@ -384,14 +394,10 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
                 server replicas."
               />
               <ServingRuntimeSizeSection
-                data={createDataInferenceService}
-                setData={setCreateDataInferenceService}
-                sizes={sizes}
+                podSpecOptionState={podSpecOptionsState}
                 servingRuntimeSelected={servingRuntimeSelected}
-                acceleratorProfileState={initialAcceleratorProfileState}
-                selectedAcceleratorProfile={selectedAcceleratorProfile}
-                setSelectedAcceleratorProfile={setSelectedAcceleratorProfile}
                 infoContent="Select a server size that will accommodate your largest model. See the product documentation for more information."
+                isEditing={!!editInfo}
               />
               <AuthServingRuntimeSection
                 data={createDataInferenceService}
@@ -406,10 +412,17 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
         {!hideForm && (
           <FormSection title="Source model location" id="model-location">
             <ConnectionSection
+              existingUriOption={
+                editInfo?.inferenceServiceEditInfo?.spec.predictor.model?.storageUri
+              }
               data={createDataInferenceService}
               setData={setCreateDataInferenceService}
+              loaded={!!projectContext?.connections || connectionsLoaded}
+              loadError={connectionsLoadError}
+              connection={connection}
               setConnection={setConnection}
               setIsConnectionValid={setIsConnectionValid}
+              connections={connections}
             />
           </FormSection>
         )}

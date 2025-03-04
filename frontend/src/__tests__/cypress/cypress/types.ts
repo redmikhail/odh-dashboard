@@ -123,6 +123,11 @@ export type WBStatusTestData = {
   wbStatusTestDescription: string;
 };
 
+export type WBNegativeTestsData = {
+  wbNegativeTestNamespace: string;
+  invalidResourceNames: string[];
+};
+
 export type CommandLineResult = {
   code: number;
   stdout: string;
@@ -250,4 +255,14 @@ enum OOTBConnectionTypes {
 export type OOTBConnectionTypesData = {
   s3: OOTBConnectionTypes.s3;
   uri: OOTBConnectionTypes.uri;
+};
+
+export type WorkloadMetricsTestData = {
+  projectName: string;
+  resourceFlavour: string;
+  clusterQueue: string;
+  localQueue: string;
+  cpuQuota: number;
+  memoryQuota: number;
+  refreshIntervals: number[];
 };

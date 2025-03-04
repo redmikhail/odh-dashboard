@@ -5,7 +5,7 @@ import {
 } from '~/__tests__/cypress/cypress/utils/oc_commands/project';
 import { loadDSPFixture } from '~/__tests__/cypress/cypress/utils/dataLoader';
 import { LDAP_CONTRIBUTOR_USER } from '~/__tests__/cypress/cypress/utils/e2eUsers';
-import { projectListPage, projectDetails } from '~/__tests__/cypress/cypress/pages/projects';
+import { projectListPage } from '~/__tests__/cypress/cypress/pages/projects';
 import {
   modelServingGlobal,
   inferenceServiceModal,
@@ -15,6 +15,10 @@ import {
   checkInferenceServiceState,
   provisionProjectForModelServing,
 } from '~/__tests__/cypress/cypress/utils/oc_commands/modelServing';
+import {
+  retryableBefore,
+  wasSetupPerformed,
+} from '~/__tests__/cypress/cypress/utils/retryableHooks';
 
 let testData: DataScienceProjectData;
 let projectName: string;
@@ -24,7 +28,7 @@ let modelFilePath: string;
 const awsBucket = 'BUCKET_3' as const;
 
 describe('Verify Model Creation and Validation using the UI', () => {
-  before(() => {
+  retryableBefore(() => {
     Cypress.on('uncaught:exception', (err) => {
       if (err.message.includes('Error: secrets "ds-pipeline-config" already exists')) {
         return false;
@@ -55,6 +59,9 @@ describe('Verify Model Creation and Validation using the UI', () => {
     );
   });
   after(() => {
+    //Check if the Before Method was executed to perform the setup
+    if (!wasSetupPerformed()) return;
+
     // Delete provisioned Project - 5 min timeout to accomadate increased time to delete a project with a model
     deleteOpenShiftProject(projectName, { timeout: 300000 });
   });
@@ -78,7 +85,9 @@ describe('Verify Model Creation and Validation using the UI', () => {
 
       // Navigate to Model Serving tab and Deploy a Single Model
       cy.step('Navigate to Model Serving and click to Deploy a Single Model');
-      projectDetails.findSectionTab('model-server').click();
+      // TODO: Revert the cy.visit(...) method once RHOAIENG-21039 is resolved
+      // Reapply projectDetails.findSectionTab('model-server').click();
+      cy.visit(`projects/${projectName}?section=model-server`);
       modelServingGlobal.findSingleServingModelButton().click();
       modelServingGlobal.findDeployModelButton().click();
 

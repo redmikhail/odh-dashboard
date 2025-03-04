@@ -19,12 +19,13 @@ import { getLabels, mergeUpdatedLabels } from '~/pages/modelRegistry/screens/uti
 import useModelArtifactsByVersionId from '~/concepts/modelRegistry/apiHooks/useModelArtifactsByVersionId';
 import { ModelRegistryContext } from '~/concepts/modelRegistry/context/ModelRegistryContext';
 import ModelTimestamp from '~/pages/modelRegistry/screens/components/ModelTimestamp';
-import { uriToObjectStorageFields } from '~/concepts/modelRegistry/utils';
+import { uriToStorageFields } from '~/concepts/modelRegistry/utils';
 import InlineTruncatedClipboardCopy from '~/components/InlineTruncatedClipboardCopy';
 import {
   bumpBothTimestamps,
   bumpRegisteredModelTimestamp,
 } from '~/concepts/modelRegistry/utils/updateTimestamps';
+import useRegisteredModelById from '~/concepts/modelRegistry/apiHooks/useRegisteredModelById';
 
 type ModelVersionDetailsViewProps = {
   modelVersion: ModelVersion;
@@ -42,9 +43,18 @@ const ModelVersionDetailsView: React.FC<ModelVersionDetailsViewProps> = ({
 
   const modelArtifact = modelArtifacts.items.length ? modelArtifacts.items[0] : null;
   const { apiState } = React.useContext(ModelRegistryContext);
-  const storageFields = uriToObjectStorageFields(modelArtifact?.uri || '');
+  const storageFields = uriToStorageFields(modelArtifact?.uri || '');
+  const [registeredModel, registeredModelLoaded, registeredModelLoadError, refreshRegisteredModel] =
+    useRegisteredModelById(mv.registeredModelId);
 
-  if (!modelArtifactsLoaded) {
+  const loaded = modelArtifactsLoaded && registeredModelLoaded;
+  const loadError = modelArtifactsLoadError || registeredModelLoadError;
+  const refreshBoth = () => {
+    refreshModelArtifacts();
+    refreshRegisteredModel();
+  };
+
+  if (!loaded) {
     return (
       <Bullseye>
         <Spinner size="xl" />
@@ -54,19 +64,21 @@ const ModelVersionDetailsView: React.FC<ModelVersionDetailsViewProps> = ({
   const handleVersionUpdate = async (updatePromise: Promise<unknown>): Promise<void> => {
     await updatePromise;
 
-    if (!mv.registeredModelId) {
+    if (!mv.registeredModelId || !registeredModel) {
       return;
     }
 
-    await bumpRegisteredModelTimestamp(apiState.api, mv.registeredModelId);
+    await bumpRegisteredModelTimestamp(apiState.api, registeredModel);
     refresh();
   };
 
   const handleArtifactUpdate = async (updatePromise: Promise<unknown>): Promise<void> => {
     try {
       await updatePromise;
-      await bumpBothTimestamps(apiState.api, mv.id, mv.registeredModelId);
-      refreshModelArtifacts();
+      if (registeredModel) {
+        await bumpBothTimestamps(apiState.api, registeredModel, mv);
+        refreshBoth();
+      }
     } catch (error) {
       throw new Error(
         `Failed to update artifact: ${error instanceof Error ? error.message : String(error)}`,
@@ -134,62 +146,62 @@ const ModelVersionDetailsView: React.FC<ModelVersionDetailsViewProps> = ({
         <Title style={{ margin: '1em 0' }} headingLevel={ContentVariants.h3}>
           Model location
         </Title>
-        {modelArtifactsLoadError ? (
-          <Alert variant="danger" isInline title={modelArtifactsLoadError.name}>
-            {modelArtifactsLoadError.message}
+        {loadError ? (
+          <Alert variant="danger" isInline title={loadError.name}>
+            {loadError.message}
           </Alert>
         ) : (
           <>
             <DescriptionList>
-              {storageFields && (
+              {storageFields?.s3Fields && (
                 <>
                   <DashboardDescriptionListGroup
                     title="Endpoint"
-                    isEmpty={modelArtifacts.size === 0 || !storageFields.endpoint}
+                    isEmpty={!storageFields.s3Fields.endpoint}
                     contentWhenEmpty="No endpoint"
                   >
                     <InlineTruncatedClipboardCopy
                       testId="storage-endpoint"
-                      textToCopy={storageFields.endpoint}
+                      textToCopy={storageFields.s3Fields.endpoint}
                     />
                   </DashboardDescriptionListGroup>
                   <DashboardDescriptionListGroup
                     title="Region"
-                    isEmpty={modelArtifacts.size === 0 || !storageFields.region}
+                    isEmpty={!storageFields.s3Fields.region}
                     contentWhenEmpty="No region"
                   >
                     <InlineTruncatedClipboardCopy
                       testId="storage-region"
-                      textToCopy={storageFields.region || ''}
+                      textToCopy={storageFields.s3Fields.region || ''}
                     />
                   </DashboardDescriptionListGroup>
                   <DashboardDescriptionListGroup
                     title="Bucket"
-                    isEmpty={modelArtifacts.size === 0 || !storageFields.bucket}
+                    isEmpty={!storageFields.s3Fields.bucket}
                     contentWhenEmpty="No bucket"
                   >
                     <InlineTruncatedClipboardCopy
                       testId="storage-bucket"
-                      textToCopy={storageFields.bucket}
+                      textToCopy={storageFields.s3Fields.bucket}
                     />
                   </DashboardDescriptionListGroup>
                   <DashboardDescriptionListGroup
                     title="Path"
-                    isEmpty={modelArtifacts.size === 0 || !storageFields.path}
+                    isEmpty={!storageFields.s3Fields.path}
                     contentWhenEmpty="No path"
                   >
                     <InlineTruncatedClipboardCopy
                       testId="storage-path"
-                      textToCopy={storageFields.path}
+                      textToCopy={storageFields.s3Fields.path}
                     />
                   </DashboardDescriptionListGroup>
                 </>
               )}
-              {!storageFields && (
+              {storageFields?.uri && (
                 <>
                   <DashboardDescriptionListGroup
                     title="URI"
-                    isEmpty={modelArtifacts.size === 0 || !modelArtifact?.uri}
+                    isEmpty={!modelArtifact?.uri}
                     contentWhenEmpty="No URI"
                   >
                     <InlineTruncatedClipboardCopy

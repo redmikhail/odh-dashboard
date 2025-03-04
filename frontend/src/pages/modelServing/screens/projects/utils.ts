@@ -23,21 +23,13 @@ import {
 } from '~/pages/modelServing/screens/types';
 import { ServingRuntimePlatform } from '~/types';
 import { DEFAULT_MODEL_SERVER_SIZES } from '~/pages/modelServing/screens/const';
-import { useAppContext } from '~/app/AppContext';
 import { useDeepCompareMemoize } from '~/utilities/useDeepCompareMemoize';
 import { EMPTY_AWS_SECRET_DATA } from '~/pages/projects/dataConnections/const';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
 import { getDisplayNameFromServingRuntimeTemplate } from '~/pages/modelServing/customServingRuntimes/utils';
-import {
-  getInferenceServiceSize,
-  getServingRuntimeSize,
-  getServingRuntimeTokens,
-  setUpTokenAuth,
-} from '~/pages/modelServing/utils';
-import { AcceleratorProfileState } from '~/utilities/useReadAcceleratorState';
+import { getServingRuntimeTokens, setUpTokenAuth } from '~/pages/modelServing/utils';
 import {
   addSupportServingPlatformProject,
-  assembleSecret,
   createInferenceService,
   createPvc,
   createSecret,
@@ -51,8 +43,12 @@ import { containsOnlySlashes, isS3PathValid, removeLeadingSlash } from '~/utilit
 import { RegisteredModelDeployInfo } from '~/pages/modelRegistry/screens/RegisteredModels/useRegisteredModelDeployInfo';
 import { getNIMData, getNIMResource } from '~/pages/modelServing/screens/projects/nimUtils';
 import { useKServeDeploymentMode } from '~/pages/modelServing/useKServeDeploymentMode';
-import { AcceleratorProfileFormData } from '~/utilities/useAcceleratorProfileFormState';
 import { Connection } from '~/concepts/connectionTypes/types';
+import { ModelServingPodSpecOptions } from '~/concepts/hardwareProfiles/useModelServingPodSpecOptionsState';
+import {
+  isModelServingTypeCompatible,
+  ModelServingCompatibleTypes,
+} from '~/concepts/connectionTypes/utils';
 
 export const getServingRuntimeSizes = (config: DashboardConfigKind): ModelServingSize[] => {
   let sizes = config.spec.modelServerSizes || [];
@@ -114,18 +110,12 @@ export const useCreateServingRuntimeObject = (existingData?: {
   data: CreatingServingRuntimeObject,
   setData: UpdateObjectAtPropAndValue<CreatingServingRuntimeObject>,
   resetDefaults: () => void,
-  sizes: ModelServingSize[],
 ] => {
-  const { dashboardConfig } = useAppContext();
-
-  const sizes = useDeepCompareMemoize(getServingRuntimeSizes(dashboardConfig));
-
   const createModelState = useGenericObjectState<CreatingServingRuntimeObject>({
     name: '',
     k8sName: '',
     servingRuntimeTemplateName: '',
     numReplicas: 1,
-    modelSize: sizes[0],
     externalRoute: false,
     tokenAuth: false,
     tokens: [],
@@ -143,10 +133,6 @@ export const useCreateServingRuntimeObject = (existingData?: {
 
   const existingNumReplicas = existingData?.servingRuntime?.spec.replicas ?? 1;
 
-  const existingSize = useDeepCompareMemoize(
-    getServingRuntimeSize(sizes, existingData?.servingRuntime),
-  );
-
   const existingExternalRoute =
     existingData?.servingRuntime?.metadata.annotations?.['enable-route'] === 'true';
   const existingTokenAuth =
@@ -161,7 +147,6 @@ export const useCreateServingRuntimeObject = (existingData?: {
       setCreateData('name', existingServingRuntimeName);
       setCreateData('servingRuntimeTemplateName', existingServingRuntimeTemplateName);
       setCreateData('numReplicas', existingNumReplicas);
-      setCreateData('modelSize', existingSize);
       setCreateData('externalRoute', existingExternalRoute);
       setCreateData('tokenAuth', existingTokenAuth);
       setCreateData('tokens', existingTokens);
@@ -171,15 +156,14 @@ export const useCreateServingRuntimeObject = (existingData?: {
     existingServingRuntimeName,
     existingServingRuntimeTemplateName,
     existingNumReplicas,
-    existingSize,
     existingExternalRoute,
     existingTokenAuth,
     existingTokens,
     setCreateData,
-    sizes,
     existingImageName,
   ]);
-  return [...createModelState, sizes];
+
+  return [...createModelState];
 };
 
 export const defaultInferenceService: CreatingInferenceServiceObject = {
@@ -187,10 +171,6 @@ export const defaultInferenceService: CreatingInferenceServiceObject = {
   k8sName: '',
   project: '',
   servingRuntimeName: '',
-  modelSize: {
-    name: '',
-    resources: {},
-  },
   storage: {
     type: InferenceServiceStorageType.EXISTING_STORAGE,
     path: '',
@@ -217,16 +197,11 @@ export const useCreateInferenceServiceObject = (
   data: CreatingInferenceServiceObject,
   setData: UpdateObjectAtPropAndValue<CreatingInferenceServiceObject>,
   resetDefaults: () => void,
-  sizes: ModelServingSize[],
 ] => {
-  const { dashboardConfig } = useAppContext();
   const { defaultMode } = useKServeDeploymentMode();
-
-  const sizes = useDeepCompareMemoize(getServingRuntimeSizes(dashboardConfig));
 
   const createInferenceServiceState = useGenericObjectState<CreatingInferenceServiceObject>({
     ...defaultInferenceService,
-    modelSize: sizes[0],
     isKServeRawDeployment: defaultMode === DeploymentMode.RawDeployment,
   });
 
@@ -249,14 +224,12 @@ export const useCreateInferenceServiceObject = (
     existingData?.spec.predictor.minReplicas ?? existingServingRuntimeData?.spec.replicas ?? 1;
   const existingMaxReplicas =
     existingData?.spec.predictor.maxReplicas ?? existingServingRuntimeData?.spec.replicas ?? 1;
+  const existingImagePullSecrets = existingData?.spec.predictor.imagePullSecrets || undefined;
 
   const existingExternalRoute = !!existingData && isInferenceServiceRouteEnabled(existingData);
   const existingTokenAuth = !!existingData && isInferenceServiceTokenEnabled(existingData);
 
   const existingTokens = useDeepCompareMemoize(getServingRuntimeTokens(secrets));
-  const existingSize = useDeepCompareMemoize(
-    getInferenceServiceSize(sizes, existingData, existingServingRuntimeData),
-  );
 
   const existingServingRuntimeArgs = existingData?.spec.predictor.model?.args;
 
@@ -268,13 +241,15 @@ export const useCreateInferenceServiceObject = (
       setCreateData('servingRuntimeName', existingServingRuntime);
       setCreateData('project', existingProject);
       setCreateData('isKServeRawDeployment', existingIsKServeRaw);
-      setCreateData('modelSize', existingSize);
       setCreateData('storage', {
-        type: existingUri
-          ? InferenceServiceStorageType.EXISTING_URI
-          : InferenceServiceStorageType.EXISTING_STORAGE,
+        type:
+          existingUri && !existingImagePullSecrets
+            ? InferenceServiceStorageType.EXISTING_URI
+            : InferenceServiceStorageType.EXISTING_STORAGE,
         path: existingStorage?.path || '',
-        dataConnection: existingStorage?.key || '',
+        dataConnection: existingImagePullSecrets
+          ? existingImagePullSecrets[0].name
+          : existingStorage?.key || '',
         uri: existingUri || '',
         awsData: EMPTY_AWS_SECRET_DATA,
       });
@@ -291,13 +266,13 @@ export const useCreateInferenceServiceObject = (
       setCreateData('tokens', existingTokens);
       setCreateData('servingRuntimeArgs', existingServingRuntimeArgs);
       setCreateData('servingRuntimeEnvVars', existingServingRuntimeEnvVars);
+      setCreateData('imagePullSecrets', existingImagePullSecrets);
     }
   }, [
     existingName,
     existingStorage,
     existingUri,
     existingFormat,
-    existingSize,
     existingServingRuntime,
     existingProject,
     existingMinReplicas,
@@ -309,9 +284,10 @@ export const useCreateInferenceServiceObject = (
     existingServingRuntimeArgs,
     existingServingRuntimeEnvVars,
     existingIsKServeRaw,
+    existingImagePullSecrets,
   ]);
 
-  return [...createInferenceServiceState, sizes];
+  return [...createInferenceServiceState];
 };
 
 export const getProjectModelServingPlatform = (
@@ -362,51 +338,39 @@ export const getProjectModelServingPlatform = (
   };
 };
 
-export const createAWSSecret = (
-  createData: CreatingInferenceServiceObject,
-  dryRun: boolean,
-): Promise<SecretKind> =>
-  createSecret(
-    assembleSecret(
-      createData.project,
-      createData.storage.awsData.reduce<Record<string, string>>(
-        (acc, { key, value }) => ({ ...acc, [key]: value }),
-        {},
-      ),
-      'aws',
-    ),
-    { dryRun },
-  );
-
 const createInferenceServiceAndDataConnection = async (
   inferenceServiceData: CreatingInferenceServiceObject,
   editInfo?: InferenceServiceKind,
   isModelMesh?: boolean,
-  initialAcceleratorProfile?: AcceleratorProfileState,
-  selectedAcceleratorProfile?: AcceleratorProfileFormData,
+  podSpecOptions?: ModelServingPodSpecOptions,
   dryRun = false,
   isStorageNeeded?: boolean,
   connection?: Connection,
 ) => {
   let secret;
   let storageUri;
-  if (inferenceServiceData.storage.type === InferenceServiceStorageType.NEW_STORAGE) {
-    if (connection) {
-      secret = await createSecret(connection, { dryRun });
-      if (connection.stringData?.URI) {
-        storageUri = connection.stringData.URI;
-      }
-    } else {
-      secret = await createAWSSecret(inferenceServiceData, dryRun);
+  let imagePullSecrets;
+  if (inferenceServiceData.storage.type === InferenceServiceStorageType.NEW_STORAGE && connection) {
+    secret = await createSecret(connection, { dryRun });
+    if (connection.stringData?.URI) {
+      storageUri = connection.stringData.URI;
+    } else if (inferenceServiceData.storage.uri) {
+      storageUri = inferenceServiceData.storage.uri;
     }
   }
   if (inferenceServiceData.storage.type === InferenceServiceStorageType.EXISTING_STORAGE) {
     if (connection?.data?.URI) {
       storageUri = window.atob(connection.data.URI);
+    } else if (inferenceServiceData.storage.uri) {
+      storageUri = inferenceServiceData.storage.uri;
     }
   }
   if (inferenceServiceData.storage.type === InferenceServiceStorageType.EXISTING_URI) {
     storageUri = inferenceServiceData.storage.uri;
+  }
+
+  if (connection?.type === 'kubernetes.io/dockerconfigjson') {
+    imagePullSecrets = [{ name: connection.metadata.name }];
   }
 
   let inferenceService;
@@ -418,12 +382,12 @@ const createInferenceServiceAndDataConnection = async (
           ...inferenceServiceData.storage,
           uri: storageUri,
         },
+        imagePullSecrets,
       },
       editInfo,
       secret?.metadata.name,
       isModelMesh,
-      initialAcceleratorProfile,
-      selectedAcceleratorProfile,
+      podSpecOptions,
       dryRun,
       isStorageNeeded,
     );
@@ -435,11 +399,11 @@ const createInferenceServiceAndDataConnection = async (
           ...inferenceServiceData.storage,
           uri: storageUri,
         },
+        imagePullSecrets,
       },
       secret?.metadata.name,
       isModelMesh,
-      initialAcceleratorProfile,
-      selectedAcceleratorProfile,
+      podSpecOptions,
       dryRun,
       isStorageNeeded,
     );
@@ -453,8 +417,7 @@ export const getSubmitInferenceServiceResourceFn = (
   servingRuntimeName: string,
   inferenceServiceName: string,
   isModelMesh?: boolean,
-  initialAcceleratorProfile?: AcceleratorProfileState,
-  selectedAcceleratorProfile?: AcceleratorProfileFormData,
+  podSpecOptions?: ModelServingPodSpecOptions,
   allowCreate?: boolean,
   secrets?: SecretKind[],
   isStorageNeeded?: boolean,
@@ -478,8 +441,7 @@ export const getSubmitInferenceServiceResourceFn = (
       inferenceServiceData,
       editInfo,
       isModelMesh,
-      initialAcceleratorProfile,
-      selectedAcceleratorProfile,
+      podSpecOptions,
       dryRun,
       isStorageNeeded,
       connection,
@@ -517,8 +479,7 @@ export const getSubmitServingRuntimeResourcesFn = (
   namespace: string,
   editInfo: ServingRuntimeEditInfo | undefined,
   allowCreate: boolean,
-  initialAcceleratorProfile: AcceleratorProfileState,
-  selectedAcceleratorProfile: AcceleratorProfileFormData,
+  podSpecOptions: ModelServingPodSpecOptions,
   servingPlatformEnablement: NamespaceApplicationCase,
   currentProject?: ProjectKind,
   name?: string,
@@ -539,10 +500,6 @@ export const getSubmitServingRuntimeResourcesFn = (
   };
 
   const createTokenAuth = servingRuntimeData.tokenAuth && allowCreate;
-
-  const controlledState: AcceleratorProfileFormData = isGpuDisabled(servingRuntimeSelected)
-    ? { count: 0, useExistingSettings: false }
-    : selectedAcceleratorProfile;
 
   if (!editInfo && !currentProject) {
     // This should be impossible to hit on resource creation, current project is undefined only on edit
@@ -566,11 +523,8 @@ export const getSubmitServingRuntimeResourcesFn = (
               data: servingRuntimeData,
               existingData: editInfo.servingRuntime,
               isCustomServingRuntimesEnabled: customServingRuntimesEnabled,
-              opts: {
-                dryRun,
-              },
-              selectedAcceleratorProfile: controlledState,
-              initialAcceleratorProfile,
+              opts: { dryRun },
+              podSpecOptions,
               isModelMesh,
             }),
             ...(isModelMesh
@@ -596,11 +550,8 @@ export const getSubmitServingRuntimeResourcesFn = (
               namespace,
               servingRuntime: servingRuntimeSelected,
               isCustomServingRuntimesEnabled: customServingRuntimesEnabled,
-              opts: {
-                dryRun,
-              },
-              selectedAcceleratorProfile: controlledState,
-              initialAcceleratorProfile,
+              opts: { dryRun },
+              podSpecOptions,
               isModelMesh,
             }).then((servingRuntime) => {
               if (isModelMesh) {
@@ -756,8 +707,27 @@ export const getCreateInferenceServiceLabels = (
   return undefined;
 };
 
-export const isConnectionPathValid = (path: string): boolean =>
-  !(containsOnlySlashes(path) || !isS3PathValid(path) || path === '');
+export const isModelPathValid = (connection: Connection, path: string, uri?: string): boolean => {
+  if (isModelServingTypeCompatible(connection, ModelServingCompatibleTypes.URI)) {
+    return true;
+  }
+  if (containsOnlySlashes(path)) {
+    return false;
+  }
+  if (
+    isModelServingTypeCompatible(connection, ModelServingCompatibleTypes.S3ObjectStorage) &&
+    !isS3PathValid(path)
+  ) {
+    return false;
+  }
+  if (
+    isModelServingTypeCompatible(connection, ModelServingCompatibleTypes.OCI) &&
+    (!uri || uri.length <= 'oci://'.length)
+  ) {
+    return false;
+  }
+  return true;
+};
 
 export const fetchInferenceServiceCount = async (namespace: string): Promise<number> => {
   try {

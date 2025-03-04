@@ -1,4 +1,4 @@
-import { CatalogModel, ModelCatalogSource } from '~/concepts/modelCatalog/types';
+import { CatalogArtifacts, CatalogModel, ModelCatalogSource } from '~/concepts/modelCatalog/types';
 import { ModelDetailsRouteParams } from './const';
 
 export const findModelFromModelCatalogSources = (
@@ -14,11 +14,11 @@ export const findModelFromModelCatalogSources = (
   }
 
   const modelMatched = modelCatalogSource.models.find(
-    (m) =>
+    (m: CatalogModel) =>
       m.repository === repositoryName &&
       tag &&
       m.name === modelName &&
-      m.artifacts?.some((f) => f.tags?.includes(tag)),
+      m.artifacts?.some((ca: CatalogArtifacts) => ca.tags?.includes(tag)),
   );
 
   return modelMatched || null;
@@ -26,13 +26,13 @@ export const findModelFromModelCatalogSources = (
 
 export const encodeParams = (params: ModelDetailsRouteParams): ModelDetailsRouteParams =>
   Object.fromEntries(
-    Object.entries(params).map(([key, value]) => [
-      key,
-      encodeURIComponent(value).replace(/\./g, '%252E'),
-    ]),
+    Object.entries(params).map(([key, value]) => [key, encodeURIComponent(value)]),
   );
 
 export const decodeParams = (params: Readonly<ModelDetailsRouteParams>): ModelDetailsRouteParams =>
   Object.fromEntries(
     Object.entries(params).map(([key, value]) => [key, decodeURIComponent(value)]),
   );
+
+export const getTagFromModel = (model: CatalogModel): string | undefined =>
+  model.artifacts?.[0]?.tags?.[0];

@@ -3,7 +3,6 @@ import { mockDscStatus } from '~/__mocks__/mockDscStatus';
 import {
   clusterSettings,
   cullerSettings,
-  instructLabSettings,
   modelServingSettings,
   notebookTolerationSettings,
   pvcSizeSettings,
@@ -15,7 +14,7 @@ import {
   asClusterAdminUser,
   asProjectAdminUser,
 } from '~/__tests__/cypress/cypress/utils/mockUsers';
-import { StackComponent } from '~/concepts/areas/types';
+import { DataScienceStackComponent, StackComponent } from '~/concepts/areas/types';
 import { DeploymentMode } from '~/k8sTypes';
 import { mockDashboardConfig, mockK8sResourceList } from '~/__mocks__';
 import { DataScienceClusterModel } from '~/__tests__/cypress/cypress/utils/models';
@@ -112,24 +111,7 @@ describe('Cluster Settings', () => {
     });
   });
 
-  it('View instructLab settings', () => {
-    cy.interceptOdh(
-      'GET /api/config',
-      mockDashboardConfig({
-        disableFineTuning: false,
-      }),
-    );
-    cy.interceptOdh('GET /api/cluster-settings', mockClusterSettings({}));
-
-    clusterSettings.visit();
-
-    instructLabSettings.findInstructLabCheckbox().click();
-    instructLabSettings.findSubmitButton().should('be.enabled');
-    instructLabSettings.findInstructLabCheckbox().click();
-    instructLabSettings.findSubmitButton().should('be.disabled');
-  });
-
-  it('View KServe defaultDeploymentMode', () => {
+  it('View and Patch KServe defaultDeploymentMode', () => {
     cy.interceptOdh(
       'GET /api/config',
       mockDashboardConfig({
@@ -139,11 +121,16 @@ describe('Cluster Settings', () => {
     cy.interceptOdh(
       'GET /api/dsc/status',
       mockDscStatus({
-        components: { kserve: { defaultDeploymentMode: DeploymentMode.RawDeployment } },
+        components: {
+          [DataScienceStackComponent.K_SERVE]: {
+            defaultDeploymentMode: DeploymentMode.RawDeployment,
+          },
+        },
         installedComponents: { [StackComponent.K_SERVE]: true, [StackComponent.MODEL_MESH]: true },
       }),
     );
     cy.interceptOdh('GET /api/cluster-settings', mockClusterSettings({}));
+    cy.interceptK8s('PATCH', DataScienceClusterModel, mockDsc({}));
 
     clusterSettings.visit();
 
@@ -159,5 +146,24 @@ describe('Cluster Settings', () => {
       .findSinglePlatformDeploymentModeSelect()
       .findSelectOption('Advanced (Serverless and Service Mesh)')
       .should('have.attr', 'aria-selected', 'false');
+
+    modelServingSettings.findSubmitButton().should('be.disabled');
+    modelServingSettings
+      .findSinglePlatformDeploymentModeSelect()
+      .findSelectOption('Advanced (Serverless and Service Mesh)')
+      .click();
+
+    modelServingSettings.findSubmitButton().should('be.enabled');
+    modelServingSettings.findSubmitButton().click();
+    modelServingSettings.findSubmitButton().should('be.disabled');
+
+    modelServingSettings
+      .findSinglePlatformDeploymentModeSelect()
+      .findSelectOption('Standard (No additional dependencies)')
+      .should('have.attr', 'aria-selected', 'false');
+    modelServingSettings
+      .findSinglePlatformDeploymentModeSelect()
+      .findSelectOption('Advanced (Serverless and Service Mesh)')
+      .should('have.attr', 'aria-selected', 'true');
   });
 });

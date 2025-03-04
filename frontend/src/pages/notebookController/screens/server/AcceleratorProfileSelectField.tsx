@@ -20,10 +20,10 @@ import SimpleSelect, { SimpleSelectOption } from '~/components/SimpleSelect';
 import { UpdateObjectAtPropAndValue } from '~/pages/projects/types';
 import { AcceleratorProfileFormData } from '~/utilities/useAcceleratorProfileFormState';
 import { AcceleratorProfileState } from '~/utilities/useReadAcceleratorState';
-import useDetectedAccelerators from './useDetectedAccelerators';
+import useAcceleratorCountWarning from './useAcceleratorCountWarning';
 
 type AcceleratorProfileSelectFieldProps = {
-  supportedAcceleratorProfiles?: string[];
+  compatibleIdentifiers?: string[];
   resourceDisplayName?: string;
   infoContent?: string;
   initialState: AcceleratorProfileState;
@@ -32,42 +32,20 @@ type AcceleratorProfileSelectFieldProps = {
 };
 
 const AcceleratorProfileSelectField: React.FC<AcceleratorProfileSelectFieldProps> = ({
-  supportedAcceleratorProfiles,
+  compatibleIdentifiers,
   resourceDisplayName = 'image',
   infoContent,
   initialState,
   formData,
   setFormData,
 }) => {
-  const [detectedAccelerators] = useDetectedAccelerators();
-
-  const generateAcceleratorCountWarning = (newSize: number) => {
-    if (!formData.profile) {
-      return '';
-    }
-
-    const { identifier } = formData.profile.spec;
-
-    const detectedAcceleratorCount = Object.entries(detectedAccelerators.available).find(
-      ([id]) => identifier === id,
-    )?.[1];
-
-    if (detectedAcceleratorCount === undefined) {
-      return `No accelerator detected with the identifier ${identifier}.`;
-    }
-    if (newSize > detectedAcceleratorCount) {
-      return `Only ${detectedAcceleratorCount} accelerator${
-        detectedAcceleratorCount > 1 ? 's' : ''
-      } detected.`;
-    }
-
-    return '';
-  };
-
-  const acceleratorCountWarning = generateAcceleratorCountWarning(formData.count);
+  const acceleratorCountWarning = useAcceleratorCountWarning(
+    formData.count,
+    formData.profile?.spec.identifier,
+  );
 
   const isAcceleratorProfileSupported = (cr: AcceleratorProfileKind) =>
-    supportedAcceleratorProfiles?.includes(cr.spec.identifier);
+    compatibleIdentifiers?.includes(cr.spec.identifier);
 
   const enabledAcceleratorProfiles = initialState.acceleratorProfiles.filter(
     (ac) => ac.spec.enabled,
@@ -109,8 +87,8 @@ const AcceleratorProfileSelectField: React.FC<AcceleratorProfileSelectFieldProps
     .map((ac) => formatOption(ac));
 
   let acceleratorAlertMessage: { title: string; variant: AlertVariant } | null = null;
-  if (formData.profile && supportedAcceleratorProfiles !== undefined) {
-    if (supportedAcceleratorProfiles.length === 0) {
+  if (formData.profile && compatibleIdentifiers !== undefined) {
+    if (compatibleIdentifiers.length === 0) {
       acceleratorAlertMessage = {
         title: `The ${resourceDisplayName} you have selected doesn't support the selected accelerator. It is recommended to use a compatible ${resourceDisplayName} for optimal performance.`,
         variant: AlertVariant.info,
