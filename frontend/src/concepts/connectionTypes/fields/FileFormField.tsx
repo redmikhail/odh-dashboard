@@ -61,6 +61,7 @@ const FileFormField: React.FC<FieldProps<FileField>> = ({
         id={id}
         name={id}
         data-testid={dataTestId}
+        style={{ padding: 0 }}
         type="text"
         isLoading={isLoading}
         value={
@@ -74,6 +75,7 @@ const FileFormField: React.FC<FieldProps<FileField>> = ({
         browseButtonText="Upload"
         clearButtonText="Clear"
         onDataChange={isPreview || !onChange ? undefined : (e, content) => onChange(content)}
+        onTextChange={isPreview || !onChange ? undefined : (e, content) => onChange(content)}
         onFileInputChange={(_e, file) => setFilename(file.name)}
         isClearButtonDisabled={rejectedReason ? false : undefined}
         onClearClick={() => {

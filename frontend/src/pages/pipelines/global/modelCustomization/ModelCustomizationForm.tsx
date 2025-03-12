@@ -1,7 +1,6 @@
 import { Breadcrumb, BreadcrumbItem, PageSection } from '@patternfly/react-core';
 import * as React from 'react';
-import { useNavigate } from 'react-router';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ApplicationsPage from '~/pages/ApplicationsPage';
 import {
   modelCustomizationFormPageDescription,
@@ -16,18 +15,23 @@ import {
   modelCustomizationFormSchema,
 } from '~/concepts/pipelines/content/modelCustomizationForm/modelCustomizationFormSchema/validationUtils';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
-import { modelCustomizationRootPath } from '~/routes';
 import { useIlabPipeline } from '~/concepts/pipelines/content/modelCustomizationForm/useIlabPipeline';
 import {
   ModelCustomizationEndpointType,
   FineTuneTaxonomyType,
 } from '~/concepts/pipelines/content/modelCustomizationForm/modelCustomizationFormSchema/types';
-import FineTunePage from './FineTunePage';
 import {
-  BASE_MODEL_INPUT_STORAGE_LOCATION_URI_KEY,
-  FineTunePageSections,
-  fineTunePageSectionTitles,
-} from './const';
+  registeredModelUrl,
+  modelVersionUrl,
+  modelRegistryUrl,
+} from '~/pages/modelRegistry/screens/routeUtils';
+import { ModelCustomizationRouterState } from '~/routes';
+import { createHyperParametersSchema } from '~/concepts/pipelines/content/modelCustomizationForm/modelCustomizationFormSchema/hyperparameterValidationUtils';
+import { getInputDefinitionParams } from '~/concepts/pipelines/content/createRun/utils';
+import { InferenceServiceStorageType } from '~/pages/modelServing/screens/types';
+import FineTunePage from './FineTunePage';
+import { FineTunePageSections, fineTunePageSectionTitles } from './const';
+import { filterHyperparameters, getParamsValueFromPipelineInput } from './utils';
 
 const ModelCustomizationForm: React.FC = () => {
   const { project } = usePipelinesAPI();
@@ -38,17 +42,23 @@ const ModelCustomizationForm: React.FC = () => {
     loadError: ilabPipelineLoadError,
   } = useIlabPipeline();
 
-  const [searchParams] = useSearchParams();
+  const { state }: { state?: ModelCustomizationRouterState } = useLocation();
 
   const [data, setData] = useGenericObjectState<ModelCustomizationFormData>({
     projectName: { value: project.metadata.name },
-    baseModel: {
-      // TODO: Replace values with actual data
-      registryName: 'Registry1',
-      name: 'my-granite-model',
-      version: 'myModel-v0.0.2',
-      inputStorageLocationUri: searchParams.get(BASE_MODEL_INPUT_STORAGE_LOCATION_URI_KEY) ?? '',
+    outputModel: {
+      addToRegistryEnabled: false,
+      outputModelRegistryName: state?.modelRegistryName,
+      outputModelName: state?.registeredModelName,
+      outputModelRegistryApiUrl: state?.outputModelRegistryApiUrl,
+      connectionData: {
+        type: InferenceServiceStorageType.EXISTING_STORAGE,
+      },
     },
+    baseModel: {
+      sdgBaseModel: state?.inputModelLocationUri ?? '',
+    },
+    inputPipelineParameters: {},
     taxonomy: {
       url: '',
 
@@ -69,36 +79,117 @@ const ModelCustomizationForm: React.FC = () => {
       endpoint: '',
       modelName: '',
     },
+    trainingNode: 1,
+    storageClass: '',
+    hardware: {
+      podSpecOptions: {
+        cpuCount: 0,
+        memoryCount: '0',
+        gpuCount: 0,
+        gpuIdentifier: '',
+        tolerations: [],
+        nodeSelector: {},
+      },
+    },
+    runType: { value: '' },
+    hyperparameters: {},
   });
 
-  const validation = useValidation(data, modelCustomizationFormSchema);
-  const isValid = validation.validationResult.success;
-  const canSubmit = ilabPipelineLoaded && isValid;
+  const { hyperparameters } = filterHyperparameters(ilabPipelineVersion);
+
+  // training node and hyperparameter default value from pipeline spec
+  React.useEffect(() => {
+    if (ilabPipelineVersion) {
+      const { hyperparameterFormData } = filterHyperparameters(ilabPipelineVersion);
+      setData('hyperparameters', {
+        ...hyperparameterFormData,
+      });
+      const parameters = getInputDefinitionParams(ilabPipelineVersion);
+      if (parameters) {
+        setData('inputPipelineParameters', parameters);
+      }
+      const trainingNodeDefaultValue = getParamsValueFromPipelineInput(
+        ilabPipelineVersion,
+        'train_num_workers',
+      )?.defaultValue;
+      if (trainingNodeDefaultValue) {
+        setData('trainingNode', Number(trainingNodeDefaultValue));
+      }
+    }
+  }, [ilabPipelineVersion, setData]);
+
+  const formValidation = useValidation(
+    data,
+    modelCustomizationFormSchema.extend({
+      hyperparameters: createHyperParametersSchema(hyperparameters),
+    }),
+  );
+
   const navigate = useNavigate();
+  const pipelineParameterErrors =
+    Object.keys(formValidation.getAllValidationIssues(['inputPipelineParameters'])).length > 0;
+
+  const filteredFineTunePageSections = React.useMemo(
+    () =>
+      pipelineParameterErrors
+        ? Object.values(FineTunePageSections).filter(
+            (section) =>
+              section === FineTunePageSections.PROJECT_DETAILS ||
+              section === FineTunePageSections.PIPELINE_DETAILS,
+          )
+        : FineTunePageSections,
+    [pipelineParameterErrors],
+  );
 
   return (
-    <ValidationContext.Provider value={validation}>
+    <ValidationContext.Provider value={formValidation}>
       <ApplicationsPage
         title={modelCustomizationFormPageTitle}
         description={modelCustomizationFormPageDescription}
         breadcrumb={
           <Breadcrumb>
-            <BreadcrumbItem to={modelCustomizationRootPath}>Model customization</BreadcrumbItem>
+            <BreadcrumbItem
+              to={state?.modelRegistryName ? modelRegistryUrl(state.modelRegistryName) : undefined}
+            >
+              {state?.modelRegistryDisplayName}
+            </BreadcrumbItem>
+            <BreadcrumbItem
+              to={
+                state?.registeredModelId && state.modelRegistryName
+                  ? registeredModelUrl(state.registeredModelId, state.modelRegistryName)
+                  : undefined
+              }
+            >
+              {state?.registeredModelName}
+            </BreadcrumbItem>
+            <BreadcrumbItem
+              to={
+                state?.modelVersionId && state.registeredModelId && state.modelRegistryName
+                  ? modelVersionUrl(
+                      state.modelVersionId,
+                      state.registeredModelId,
+                      state.modelRegistryName,
+                    )
+                  : undefined
+              }
+            >
+              {state?.modelVersionName}
+            </BreadcrumbItem>
             <BreadcrumbItem>Start an InstructLab run</BreadcrumbItem>
           </Breadcrumb>
         }
-        loaded
+        loaded={ilabPipelineLoaded}
         empty={false}
       >
         <EnsureAPIAvailability>
           <PageSection hasBodyWrapper={false} isFilled>
             <GenericSidebar
-              sections={Object.values(FineTunePageSections)}
+              sections={Object.values(filteredFineTunePageSections)}
               titles={fineTunePageSectionTitles}
-              maxWidth={175}
+              maxWidth={200}
             >
               <FineTunePage
-                isInvalid={!canSubmit || !!ilabPipelineLoadError}
+                canSubmit={!!ilabPipelineLoadError}
                 onSuccess={() =>
                   navigate(
                     `/pipelines/${encodeURIComponent(project.metadata.name)}/${encodeURIComponent(
@@ -110,6 +201,7 @@ const ModelCustomizationForm: React.FC = () => {
                 setData={setData}
                 ilabPipeline={ilabPipeline}
                 ilabPipelineVersion={ilabPipelineVersion}
+                ilabPipelineLoaded={ilabPipelineLoaded}
               />
             </GenericSidebar>
           </PageSection>

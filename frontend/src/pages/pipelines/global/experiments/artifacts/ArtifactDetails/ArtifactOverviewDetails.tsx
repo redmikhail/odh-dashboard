@@ -25,6 +25,9 @@ import { useGetExecutionById } from '~/concepts/pipelines/apiHooks/mlmd/useGetEx
 import { useGetPipelineRunContextByExecution } from '~/concepts/pipelines/apiHooks/mlmd/useGetMlmdContextByExecution';
 import usePipelineRunById from '~/concepts/pipelines/apiHooks/usePipelineRunById';
 import { getOriginalExecutionId } from '~/pages/pipelines/global/experiments/executions/utils';
+import PipelineRunRegisteredModelDetails from '~/concepts/pipelines/content/pipelinesDetails/pipelineRun/PipelineRunRegisteredModelDetails';
+import { getArtifactModelData } from '~/concepts/pipelines/content/pipelinesDetails/pipelineRun/artifacts/utils';
+import { SupportedArea, useIsAreaAvailable } from '~/concepts/areas';
 import { ArtifactPropertyDescriptionList } from './ArtifactPropertyDescriptionList';
 
 interface ArtifactOverviewDetailsProps {
@@ -40,6 +43,14 @@ export const ArtifactOverviewDetails: React.FC<ArtifactOverviewDetailsProps> = (
   const actualExecutionId = originalExecutionId ? Number(originalExecutionId) : execution?.getId();
   const [context] = useGetPipelineRunContextByExecution(actualExecutionId);
   const [run, runLoaded, runError] = usePipelineRunById(context?.getName());
+  const { status: modelRegistryAvailable } = useIsAreaAvailable(SupportedArea.MODEL_REGISTRY);
+
+  const artifactModelData = React.useMemo(() => {
+    if (!modelRegistryAvailable || !artifact) {
+      return {};
+    }
+    return getArtifactModelData(artifact);
+  }, [artifact, modelRegistryAvailable]);
 
   return (
     <Flex
@@ -153,6 +164,18 @@ export const ArtifactOverviewDetails: React.FC<ArtifactOverviewDetailsProps> = (
           )}
         </Stack>
       </FlexItem>
+      {artifactModelData.registeredModelName && (
+        <FlexItem data-testid="artifact-registered-model-section">
+          <Stack hasGutter>
+            <StackItem>
+              <Title headingLevel="h3">Registered models</Title>
+            </StackItem>
+            <StackItem>
+              <PipelineRunRegisteredModelDetails artifactModelData={artifactModelData} />
+            </StackItem>
+          </Stack>
+        </FlexItem>
+      )}
     </Flex>
   );
 };

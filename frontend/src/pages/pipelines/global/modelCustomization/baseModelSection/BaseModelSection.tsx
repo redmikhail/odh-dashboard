@@ -14,9 +14,18 @@ const FIELD_ID_PREFIX = 'model-customization-baseModel';
 type BaseModelSectionProps = {
   data: BaseModelFormData;
   setData: (data: BaseModelFormData) => void;
+  registryName?: string;
+  inputModelName?: string;
+  inputModelVersionName?: string;
 };
 
-const BaseModelSection: React.FC<BaseModelSectionProps> = ({ data, setData }) => (
+const BaseModelSection: React.FC<BaseModelSectionProps> = ({
+  data,
+  setData,
+  registryName,
+  inputModelName,
+  inputModelVersionName,
+}) => (
   <FormSection
     id={FineTunePageSections.BASE_MODEL}
     title={fineTunePageSectionTitles[FineTunePageSections.BASE_MODEL]}
@@ -35,26 +44,26 @@ const BaseModelSection: React.FC<BaseModelSectionProps> = ({ data, setData }) =>
         </Alert>
       </FlexItem>
     </Flex>
-    <FormGroup label="Model registry" fieldId={`${FIELD_ID_PREFIX}-registryName`} required>
-      {data.registryName}
+    <FormGroup label="Model registry" fieldId={`${FIELD_ID_PREFIX}-registryName`}>
+      {registryName ?? '-'}
     </FormGroup>
-    <FormGroup label="Model name" fieldId={`${FIELD_ID_PREFIX}-name`} required>
-      {data.name}
+    <FormGroup label="Model name" fieldId={`${FIELD_ID_PREFIX}-name`}>
+      {inputModelName ?? '-'}
     </FormGroup>
-    <FormGroup label="Model version" fieldId={`${FIELD_ID_PREFIX}-version`} required>
-      {data.version}
+    <FormGroup label="Model version" fieldId={`${FIELD_ID_PREFIX}-version`}>
+      {inputModelVersionName ?? '-'}
     </FormGroup>
     <FormGroup
       label="Model input storage location URI"
       fieldId={`${FIELD_ID_PREFIX}-inputStorageLocationUri`}
-      required
+      isRequired
     >
       <InlineEditText
         onSave={(text) => {
-          setData({ ...data, inputStorageLocationUri: text });
+          setData({ ...data, sdgBaseModel: text });
         }}
         checkSupported={(text) => text.startsWith(`${RED_HAT_REGISTRY_PREFIX}/`)}
-        text={data.inputStorageLocationUri}
+        text={data.sdgBaseModel}
         unsupportedMessage={`At this time, the model must be sourced from the catalog in Red Hat Registry (${RED_HAT_REGISTRY_PREFIX}). However, if your platform is configured with the required pull secrets, the model can be sourced from an OCI registry or public setup.`}
       />
     </FormGroup>

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Flex, FlexItem } from '@patternfly/react-core';
 import {
   asTimestamp,
   DetailItem,
@@ -7,6 +8,10 @@ import {
 import { relativeDuration } from '~/utilities/time';
 import { RuntimeStateKF } from '~/concepts/pipelines/kfTypes';
 import { PipelineTask } from '~/concepts/pipelines/topology';
+import TaskDetailsSection from '~/concepts/pipelines/content/pipelinesDetails/taskDetails/TaskDetailsSection';
+import { SupportedArea, useIsAreaAvailable } from '~/concepts/areas';
+import { getArtifactModelData } from './artifacts/utils';
+import PipelineRunRegisteredModelDetails from './PipelineRunRegisteredModelDetails';
 
 type SelectedNodeDetailsTabProps = {
   task: PipelineTask;
@@ -19,6 +24,23 @@ const SelectedNodeDetailsTab: React.FC<SelectedNodeDetailsTabProps> = ({ task })
     key: 'Task name',
     value: task.name,
   };
+
+  const artifacts = task.outputs?.artifacts;
+
+  const { status: modelRegistryAvailable } = useIsAreaAvailable(SupportedArea.MODEL_REGISTRY);
+
+  const artifactModelData = React.useMemo(() => {
+    if (!modelRegistryAvailable || !artifacts) {
+      return [];
+    }
+
+    return artifacts.map((artifactInputOutput) => {
+      const artifact = artifactInputOutput.value;
+      return getArtifactModelData(artifact);
+    });
+  }, [artifacts, modelRegistryAvailable]);
+
+  const isModelRegistered = artifactModelData.length > 0;
 
   if (task.status) {
     const { startTime, completeTime, state } = task.status;
@@ -56,7 +78,40 @@ const SelectedNodeDetailsTab: React.FC<SelectedNodeDetailsTabProps> = ({ task })
     details = [taskName];
   }
 
-  return <>{renderDetailItems(details)}</>;
+  return (
+    <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsXl' }}>
+      <FlexItem>
+        <TaskDetailsSection title="Task details" testId="task-details">
+          {renderDetailItems(details)}
+        </TaskDetailsSection>
+      </FlexItem>
+      {isModelRegistered && (
+        <FlexItem>
+          <TaskDetailsSection title="Registered models" testId="registered-models">
+            {renderDetailItems([
+              {
+                key: 'Name',
+                value: (
+                  <>
+                    {artifactModelData.length ? (
+                      artifactModelData.map((data) => (
+                        <PipelineRunRegisteredModelDetails
+                          key={data.modelVersionId}
+                          artifactModelData={data}
+                        />
+                      ))
+                    ) : (
+                      <span>No model details available</span>
+                    )}
+                  </>
+                ),
+              },
+            ])}
+          </TaskDetailsSection>
+        </FlexItem>
+      )}
+    </Flex>
+  );
 };
 
 export default SelectedNodeDetailsTab;

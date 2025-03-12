@@ -28,8 +28,7 @@ export const allFeatureFlags: string[] = Object.keys({
   disableKServe: false,
   disableKServeAuth: false,
   disableKServeMetrics: false,
-  disableKServeRaw: true,
-  disableKServeOCIModels: true,
+  disableKServeRaw: false,
   disableModelMesh: false,
   disableAcceleratorProfiles: false,
   disableHardwareProfiles: false,
@@ -95,10 +94,6 @@ export const SupportedAreasStateMap: SupportedAreasState = {
     featureFlags: ['disableKServeRaw'],
     reliantAreas: [SupportedArea.K_SERVE, SupportedArea.MODEL_SERVING],
   },
-  [SupportedArea.K_SERVE_OCI]: {
-    featureFlags: ['disableKServeOCIModels'],
-    reliantAreas: [SupportedArea.K_SERVE, SupportedArea.MODEL_SERVING],
-  },
   [SupportedArea.MODEL_MESH]: {
     featureFlags: ['disableModelMesh'],
     requiredComponents: [StackComponent.MODEL_MESH],
@@ -157,7 +152,11 @@ export const SupportedAreasStateMap: SupportedAreasState = {
   },
   [SupportedArea.FINE_TUNING]: {
     featureFlags: ['disableFineTuning'],
-    reliantAreas: [SupportedArea.DS_PIPELINES],
+    reliantAreas: [
+      SupportedArea.DS_PIPELINES,
+      SupportedArea.MODEL_CATALOG,
+      SupportedArea.MODEL_REGISTRY,
+    ],
   },
 };
 

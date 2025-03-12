@@ -31,14 +31,17 @@ import { useK8sNameDescriptionFieldData } from '~/concepts/k8s/K8sNameDescriptio
 import { isK8sNameDescriptionDataValid } from '~/concepts/k8s/K8sNameDescriptionField/utils';
 import {
   assembleConnectionSecret,
+  filterEnabledConnectionTypes,
   getConnectionTypeDisplayName,
   getConnectionTypeRef,
   getDefaultValues,
   getMRConnectionValues,
   isConnectionTypeDataField,
-  isModelServingTypeCompatible,
+  isModelServingCompatible,
   ModelServingCompatibleTypes,
+  OCIConnectionTypeKeys,
   S3ConnectionTypeKeys,
+  URIConnectionTypeKeys,
   withRequiredFields,
 } from '~/concepts/connectionTypes/utils';
 import { ConnectionDetailsHelperText } from '~/concepts/connectionTypes/ConnectionDetailsHelperText';
@@ -50,8 +53,8 @@ import {
   LabeledConnection,
 } from '~/pages/modelServing/screens/types';
 import { UpdateObjectAtPropAndValue } from '~/pages/projects/types';
-import useConnections from '~/pages/projects/screens/detail/connections/useConnections';
 import { isModelPathValid } from '~/pages/modelServing/screens/projects/utils';
+import usePersistentData from '~/pages/projects/screens/detail/connections/usePersistentData';
 import ConnectionS3FolderPathField from './ConnectionS3FolderPathField';
 import ConnectionOciPathField from './ConnectionOciPathField';
 
@@ -175,12 +178,12 @@ const ExistingConnectionField: React.FC<ExistingConnectionFieldProps> = ({
         )}
       </FormGroup>
       {selectedConnection &&
-        isModelServingTypeCompatible(
+        isModelServingCompatible(
           selectedConnection,
           ModelServingCompatibleTypes.S3ObjectStorage,
         ) && <ConnectionS3FolderPathField folderPath={folderPath} setFolderPath={setFolderPath} />}
       {selectedConnection &&
-        isModelServingTypeCompatible(selectedConnection, ModelServingCompatibleTypes.OCI) && (
+        isModelServingCompatible(selectedConnection, ModelServingCompatibleTypes.OCI) && (
           <ConnectionOciPathField
             ociHost={window.atob(selectedConnection.data?.OCI_HOST ?? '')}
             modelUri={modelUri}
@@ -211,8 +214,7 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
   setIsConnectionValid,
 }) => {
   const enabledConnectionTypes = React.useMemo(
-    () =>
-      connectionTypes.filter((t) => t.metadata.annotations?.['opendatahub.io/disabled'] !== 'true'),
+    () => filterEnabledConnectionTypes(connectionTypes),
     [connectionTypes],
   );
   const [selectedConnectionType, setSelectedConnectionType] = React.useState<
@@ -249,16 +251,26 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
             connectionTypes.find(
               (t) => getResourceNameFromK8sResource(t) === data.storage.connectionType,
             ),
-            ['URI'],
+            URIConnectionTypeKeys,
           ),
         );
         setConnectionValues(getMRConnectionValues(data.storage.uri));
       }
+      if (data.storage.uri?.startsWith('oci:')) {
+        setSelectedConnectionType(
+          withRequiredFields(
+            connectionTypes.find(
+              (t) => getResourceNameFromK8sResource(t) === data.storage.connectionType,
+            ),
+            OCIConnectionTypeKeys,
+          ),
+        );
+      }
     }
   }, [data.storage.connectionType, connectionTypes, data.storage.uri, data.storage.awsData]);
 
-  const [validations, setValidations] = React.useState<{
-    [key: string]: boolean;
+  const [connectionErrors, setConnectionErrors] = React.useState<{
+    [key: string]: boolean | string;
   }>({});
   const isFormValid = React.useMemo(
     () =>
@@ -271,8 +283,8 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
           !connectionValues[field.envVar] &&
           field.type !== ConnectionTypeFieldType.Boolean,
       ) &&
-      !Object.values(validations).includes(false),
-    [selectedConnectionType, nameDescData, connectionValues, validations],
+      !Object.values(connectionErrors).find((e) => !!e),
+    [selectedConnectionType, nameDescData, connectionValues, connectionErrors],
   );
 
   React.useEffect(() => {
@@ -294,6 +306,7 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
   }, [
     connectionValues,
     data.project,
+    connectionErrors,
     data.storage.path,
     modelUri,
     isFormValid,
@@ -302,6 +315,14 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
     setIsConnectionValid,
     setNewConnection,
   ]);
+
+  const { changeSelectionType } = usePersistentData({
+    setConnectionValues,
+    setConnectionErrors,
+    setSelectedConnectionType,
+    connectionValues,
+    selectedConnectionType,
+  });
 
   return (
     <FormSection>
@@ -315,6 +336,8 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
               S3ConnectionTypeKeys,
             ),
           );
+          const obj = connectionTypes.find((c) => c.metadata.name === type);
+          changeSelectionType(obj);
         }}
         connectionNameDesc={nameDescData}
         setConnectionNameDesc={setNameDescData}
@@ -322,12 +345,19 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
         onChange={(field, value) =>
           setConnectionValues((prev) => ({ ...prev, [field.envVar]: value }))
         }
-        onValidate={(field, isValid) =>
-          setValidations((prev) => ({ ...prev, [field.envVar]: isValid }))
-        }
+        onValidate={(field, error, value) => {
+          let newError = error;
+          if (field.envVar === 'ACCESS_TYPE' && Array.isArray(value)) {
+            if (value.includes('Push') && !value.includes('Pull')) {
+              newError = 'Access type must include pull';
+            }
+          }
+          setConnectionErrors((prev) => ({ ...prev, [field.envVar]: newError }));
+        }}
+        connectionErrors={connectionErrors}
       />
       {selectedConnectionType &&
-        isModelServingTypeCompatible(
+        isModelServingCompatible(
           selectedConnectionType,
           ModelServingCompatibleTypes.S3ObjectStorage,
         ) && (
@@ -337,7 +367,7 @@ const NewConnectionField: React.FC<NewConnectionFieldProps> = ({
           />
         )}
       {selectedConnectionType &&
-        isModelServingTypeCompatible(selectedConnectionType, ModelServingCompatibleTypes.OCI) && (
+        isModelServingCompatible(selectedConnectionType, ModelServingCompatibleTypes.OCI) && (
           <ConnectionOciPathField modelUri={modelUri} setModelUri={setModelUri} />
         )}
     </FormSection>
@@ -368,21 +398,20 @@ export const ConnectionSection: React.FC<Props> = ({
   connections,
 }) => {
   const [connectionTypes] = useWatchConnectionTypes(true);
-  const [projectConnections] = useConnections(data.project, true);
 
   const hasImagePullSecret = React.useMemo(() => !!data.imagePullSecrets, [data.imagePullSecrets]);
 
   const selectedConnection = React.useMemo(
     () =>
-      projectConnections.find(
-        (c) => getResourceNameFromK8sResource(c) === data.storage.dataConnection,
+      connections?.find(
+        (c) => getResourceNameFromK8sResource(c.connection) === data.storage.dataConnection,
       ),
-    [projectConnections, data.storage.dataConnection],
+    [connections, data.storage.dataConnection],
   );
 
   React.useEffect(() => {
     if (selectedConnection && !connection) {
-      setConnection(selectedConnection);
+      setConnection(selectedConnection.connection);
     }
   }, [selectedConnection, connection, setConnection]);
 
@@ -400,6 +429,7 @@ export const ConnectionSection: React.FC<Props> = ({
         <Radio
           id="existing-uri-radio"
           name="existing-uri-radio"
+          data-testid="existing-uri-radio"
           label="Current URI"
           isChecked={data.storage.type === InferenceServiceStorageType.EXISTING_URI}
           onChange={() => {
@@ -438,7 +468,7 @@ export const ConnectionSection: React.FC<Props> = ({
               <ExistingConnectionField
                 connectionTypes={connectionTypes}
                 projectConnections={connections}
-                selectedConnection={selectedConnection}
+                selectedConnection={selectedConnection?.connection}
                 onSelect={(selection) => {
                   setConnection(selection);
                   setData('storage', {

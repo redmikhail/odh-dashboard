@@ -30,6 +30,10 @@ import { FetchState } from '~/utilities/useFetchState';
 import { PipelineRunKF } from '~/concepts/pipelines/kfTypes';
 import PipelineNotSupported from '~/concepts/pipelines/content/pipelinesDetails/pipeline/PipelineNotSupported';
 import { isArgoWorkflow } from '~/concepts/pipelines/content/tables/utils';
+import { isPipelineRunRegistered } from '~/concepts/pipelines/content/tables/pipelineRun/utils';
+import { fireFormTrackingEvent } from '~/concepts/analyticsTracking/segmentIOUtils';
+import { TrackingOutcome } from '~/concepts/analyticsTracking/trackingProperties';
+import { SupportedArea, useIsAreaAvailable } from '~/concepts/areas';
 import { usePipelineRunArtifacts } from './artifacts';
 import { PipelineRunDetailsTabs } from './PipelineRunDetailsTabs';
 
@@ -62,6 +66,8 @@ const PipelineRunDetails: React.FC<
     artifacts,
   );
   const isInvalidPipelineVersion = isArgoWorkflow(version?.pipeline_spec);
+  const { status: modelRegistryAvailable } = useIsAreaAvailable(SupportedArea.MODEL_REGISTRY);
+  const isRegistered = modelRegistryAvailable ? isPipelineRunRegistered(artifacts) : false;
 
   const selectedNode = React.useMemo(() => {
     if (isInvalidPipelineVersion) {
@@ -108,7 +114,16 @@ const PipelineRunDetails: React.FC<
     <>
       <ApplicationsPage
         title={
-          run ? <PipelineDetailsTitle run={run} statusIcon pipelineRunLabel /> : 'Error loading run'
+          run ? (
+            <PipelineDetailsTitle
+              run={run}
+              statusIcon
+              pipelineRunLabel
+              isRegistered={isRegistered}
+            />
+          ) : (
+            'Error loading run'
+          )
         }
         subtext={
           run && (
@@ -160,6 +175,7 @@ const PipelineRunDetails: React.FC<
                 sidePanel={panelContent}
               />
             }
+            artifacts={artifacts}
           />
         )}
       </ApplicationsPage>
@@ -167,6 +183,10 @@ const PipelineRunDetails: React.FC<
         type={PipelineRunType.ARCHIVED}
         toDeleteResources={deleting && run ? [run] : []}
         onClose={(deleteComplete) => {
+          fireFormTrackingEvent('Pipeline Run Deleted', {
+            outcome: TrackingOutcome.submit,
+            success: true,
+          });
           if (deleteComplete) {
             navigate(contextPath);
           } else {

@@ -104,6 +104,7 @@ const EnableModal: React.FC<EnableModalProps> = ({ selectedApp, shown, onClose }
       onClose={handleClose}
       actions={[
         <Button
+          data-testid="enable-app-submit"
           key="confirm"
           variant="primary"
           onClick={onDoEnableApp}
@@ -148,7 +149,12 @@ const EnableModal: React.FC<EnableModalProps> = ({ selectedApp, shown, onClose }
                 variant="info"
                 title={
                   <div className="odh-enable-modal__progress-title">
-                    <Spinner size="md" /> Validating your entries
+                    <Spinner size="md" />
+                    {enable.inProgressText ? (
+                      <div style={{ whiteSpace: 'pre-line' }}>{enable.inProgressText}</div>
+                    ) : (
+                      'Validating your entries'
+                    )}
                   </div>
                 }
                 aria-live="polite"
