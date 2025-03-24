@@ -6,6 +6,7 @@ import {
   teacherModelSection,
   taxonomySection,
   hardwareSection,
+  baseModelSection,
 } from '~/__tests__/cypress/cypress/pages/pipelines/modelCustomizationForm';
 import {
   buildMockPipeline,
@@ -14,8 +15,14 @@ import {
   buildMockPipelineVersions,
   mockDashboardConfig,
   mockDataSciencePipelineApplicationK8sResource,
+  mockDscStatus,
   mockK8sResourceList,
+  mockModelArtifactList,
+  mockModelRegistryService,
+  mockModelVersion,
+  mockModelVersionList,
   mockProjectK8sResource,
+  mockRegisteredModel,
   mockRouteK8sResource,
   mockSecretK8sResource,
   mockStorageClassList,
@@ -26,12 +33,14 @@ import {
   ProjectModel,
   RouteModel,
   SecretModel,
+  ServiceModel,
   StorageClassModel,
 } from '~/__tests__/cypress/cypress/utils/models';
 import { mockHardwareProfile } from '~/__mocks__/mockHardwareProfile';
 import { TolerationEffect, TolerationOperator } from '~/types';
 
 const projectName = 'test-project-name-2';
+const MODEL_REGISTRY_API_VERSION = 'v1alpha3';
 const invalidMockPipeline = buildMockPipeline();
 const initialMockPipeline = buildMockPipeline({
   display_name: 'instructlab',
@@ -52,6 +61,25 @@ const invalidMockIlabPipeline = buildMockPipelineVersion({
   pipeline_id: initialMockPipeline.pipeline_id,
 });
 
+const visitModelVersionDetails = ({
+  serviceName,
+  versionNo,
+}: {
+  serviceName: string;
+  versionNo: string;
+}) => {
+  cy.visit(`/modelRegistry/${serviceName}/registeredModels/1/versions/${versionNo}/details`);
+  cy.wait('@getRegisteredModel');
+  cy.wait('@getModelVersion');
+  cy.wait('@getModelVersions');
+  cy.findByTestId('app-page-title').contains('Version 1');
+  cy.findByTestId('lab-tune-button').click();
+  cy.findByTestId('start-run-modal').should('exist'); // Verify the start run modal appears
+  cy.findByTestId('project-selector-toggle').click(); // Select a project in the modal
+  cy.findByTestId('project-selector-menu').findByText('Test Project 2').click();
+  cy.findByTestId('modal-submit-button').should('not.be.disabled').click(); // Ensure the Continue button is enabled and click it
+};
+
 describe('Model Customization Form', () => {
   it('Empty state', () => {
     initIntercepts({ isEmptyProject: true });
@@ -64,12 +92,14 @@ describe('Model Customization Form', () => {
     modelCustomizationFormGlobal.invalidVisit();
     modelCustomizationFormGlobal.findEmptyState().should('exist');
   });
-  // TODO: update this test once the tunning button is available
+
   it('Should submit', () => {
     initIntercepts({});
-    modelCustomizationFormGlobal.visit(projectName);
+    setupModelRegistryIntercepts({ modelRegistryServiceName: 'modelregistry-sample' });
+    visitModelVersionDetails({ serviceName: 'modelregistry-sample', versionNo: '1' });
     cy.wait('@getIlabPipeline');
     cy.wait('@getPipelineVersions');
+    baseModelSection.editInlineText('http://test.com');
     teacherModelSection.findEndpointInput().type('http://test.com');
     teacherModelSection.findModelNameInput().type('test');
     judgeModelSection.findEndpointInput().type('http://test.com');
@@ -85,19 +115,8 @@ describe('Model Customization Form', () => {
     );
     hardwareSection.findTrainingNodePlusButton().click();
 
-    modelCustomizationFormGlobal.findSubmitButton().should('be.disabled');
+    modelCustomizationFormGlobal.findSubmitButton().should('not.be.disabled');
     modelCustomizationFormGlobal.findSimpleRunButton().click();
-    modelCustomizationFormGlobal.findExpandableSectionButton().click();
-    modelCustomizationFormGlobal.findNumericInputPlusButton('sdg_scale_factor').click();
-    modelCustomizationFormGlobal.findNumericInputPlusButton('train_num_workers').click();
-    modelCustomizationFormGlobal
-      .findLongNumberInput('train_learning_rate_phase_1-long-number-field')
-      .clear()
-      .type('0.01');
-    modelCustomizationFormGlobal
-      .findRadioInput('final_eval_batch_size-exact-evaluation-field')
-      .click();
-    modelCustomizationFormGlobal.findNumericInputPlusButton('final_eval_batch_size').click();
   });
 
   it('Alert message when ilab pipeline required parameters are absent', () => {
@@ -125,6 +144,21 @@ describe('Model Customization Form', () => {
     cy.wait('@getIlabPipeline');
     modelCustomizationFormGlobal.findSubmitButton().should('not.exist');
   });
+
+  it('should navigate to the model customization page on clicking cancel when state is not available', () => {
+    initIntercepts({});
+    modelCustomizationFormGlobal.visit(projectName);
+    modelCustomizationFormGlobal.findCancelButton().click();
+    cy.url().should('include', `/modelCustomization`);
+  });
+
+  it('should navigate to Model Customization from Model Registry via LabTune button and back on cancel button when state is available', () => {
+    initIntercepts({});
+    setupModelRegistryIntercepts({ modelRegistryServiceName: 'modelregistry-sample' });
+    visitModelVersionDetails({ serviceName: 'modelregistry-sample', versionNo: '1' });
+    cy.url().should('include', `/modelCustomization/fine-tune/${projectName}`);
+    modelCustomizationFormGlobal.findCancelButton().click();
+  });
 });
 
 type HandlersProps = {
@@ -132,6 +166,11 @@ type HandlersProps = {
   disableHardwareProfiles?: boolean;
   isEmptyProject?: boolean;
   isValid?: boolean;
+  disableModelRegistry?: boolean;
+};
+
+type ModelRegistryProps = {
+  modelRegistryServiceName: string;
 };
 
 export const initIntercepts = (
@@ -140,6 +179,7 @@ export const initIntercepts = (
     disableHardwareProfiles = false,
     isEmptyProject,
     isValid = true,
+    disableModelRegistry = false,
   }: HandlersProps = {
     isEmptyProject: false,
   },
@@ -149,6 +189,7 @@ export const initIntercepts = (
     mockDashboardConfig({
       disableFineTuning,
       disableHardwareProfiles,
+      disableModelRegistry,
     }),
   );
   cy.interceptK8sList(
@@ -332,4 +373,78 @@ export const initIntercepts = (
     },
     buildMockPipeline(initialMockPipeline),
   ).as('getIlabPipeline');
+};
+
+const setupModelRegistryIntercepts = ({ modelRegistryServiceName }: ModelRegistryProps) => {
+  cy.interceptOdh(
+    'GET /api/dsc/status',
+    mockDscStatus({
+      installedComponents: {
+        'model-registry-operator': true,
+        'data-science-pipelines-operator': true,
+      },
+    }),
+  );
+
+  cy.interceptK8sList(
+    ServiceModel,
+    mockK8sResourceList([mockModelRegistryService({ name: modelRegistryServiceName })]),
+  );
+
+  cy.interceptOdh(
+    'GET /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/registered_models/:registeredModelId',
+    {
+      path: {
+        serviceName: modelRegistryServiceName,
+        apiVersion: MODEL_REGISTRY_API_VERSION,
+        registeredModelId: 1,
+      },
+    },
+    mockRegisteredModel({}),
+  ).as('getRegisteredModel');
+
+  cy.interceptOdh(
+    'GET /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/registered_models/:registeredModelId/versions',
+    {
+      path: {
+        serviceName: modelRegistryServiceName,
+        apiVersion: MODEL_REGISTRY_API_VERSION,
+        registeredModelId: 1,
+      },
+    },
+    mockModelVersionList({
+      items: [
+        mockModelVersion({
+          name: 'Version 1',
+          author: 'Author 1',
+          registeredModelId: '1',
+          id: '1',
+        }),
+      ],
+    }),
+  ).as('getModelVersions');
+
+  cy.interceptOdh(
+    'GET /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/model_versions/:modelVersionId',
+    {
+      path: {
+        serviceName: modelRegistryServiceName,
+        apiVersion: MODEL_REGISTRY_API_VERSION,
+        modelVersionId: 1,
+      },
+    },
+    mockModelVersion({ id: '1', name: 'Version 1' }),
+  ).as('getModelVersion');
+
+  cy.interceptOdh(
+    'GET /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/model_versions/:modelVersionId/artifacts',
+    {
+      path: {
+        serviceName: modelRegistryServiceName,
+        apiVersion: MODEL_REGISTRY_API_VERSION,
+        modelVersionId: 1,
+      },
+    },
+    mockModelArtifactList({}),
+  ).as('getModelArtifacts');
 };

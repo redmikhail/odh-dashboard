@@ -21,12 +21,12 @@ import {
 import { requestsUnderLimits, resourcesArePositive } from '~/pages/modelServing/utils';
 import useCustomServingRuntimesEnabled from '~/pages/modelServing/customServingRuntimes/useCustomServingRuntimesEnabled';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
-import { ServingRuntimeEditInfo } from '~/pages/modelServing/screens/types';
+import { ModelServingSize, ServingRuntimeEditInfo } from '~/pages/modelServing/screens/types';
 import ServingRuntimeSizeSection from '~/pages/modelServing/screens/projects/ServingRuntimeModal/ServingRuntimeSizeSection';
 import NIMModelListSection from '~/pages/modelServing/screens/projects/NIMServiceModal/NIMModelListSection';
 import NIMModelDeploymentNameSection from '~/pages/modelServing/screens/projects/NIMServiceModal/NIMModelDeploymentNameSection';
 import ProjectSection from '~/pages/modelServing/screens/projects/InferenceServiceModal/ProjectSection';
-import { DataConnection, NamespaceApplicationCase } from '~/pages/projects/types';
+import { NamespaceApplicationCase } from '~/pages/projects/types';
 import {
   getDisplayNameFromK8sResource,
   translateDisplayNameForK8s,
@@ -65,7 +65,6 @@ type ManageNIMServingModalProps = {
   {
     projectContext?: {
       currentProject: ProjectKind;
-      dataConnections: DataConnection[];
     };
   },
   {
@@ -132,21 +131,25 @@ const ManageNIMServingModal: React.FC<ManageNIMServingModalProps> = ({
     }
   }, [currentProjectName, setCreateDataInferenceService]);
 
-  React.useEffect(() => {
-    podSpecOptionsState.modelSize.setSelectedSize({
+  const NIM_CUSTOM_DEFAULTS: ModelServingSize = React.useMemo(
+    () => ({
       name: 'Custom',
       resources: {
-        limits: {
-          cpu: '16',
-          memory: '64Gi',
-        },
-        requests: {
-          cpu: '8',
-          memory: '32Gi',
-        },
+        limits: { cpu: '16', memory: '64Gi' },
+        requests: { cpu: '8', memory: '32Gi' },
       },
-    });
-  }, [podSpecOptionsState]);
+    }),
+    [],
+  );
+
+  const hasSetDefault = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!hasSetDefault.current) {
+      podSpecOptionsState.modelSize.setSelectedSize(NIM_CUSTOM_DEFAULTS);
+      hasSetDefault.current = true;
+    }
+  }, [NIM_CUSTOM_DEFAULTS, podSpecOptionsState.modelSize]);
 
   // Serving Runtime Validation
   const isDisabledServingRuntime =
@@ -374,15 +377,15 @@ const ManageNIMServingModal: React.FC<ManageNIMServingModalProps> = ({
             servingRuntimeSelected={servingRuntimeSelected}
             podSpecOptionState={podSpecOptionsState}
             infoContent="Select CPU and memory resources large enough to support the NIM being deployed."
+            customDefaults={NIM_CUSTOM_DEFAULTS}
           />
-          {isAuthAvailable && (
-            <AuthServingRuntimeSection
-              data={createDataInferenceService}
-              setData={setCreateDataInferenceService}
-              allowCreate={allowCreate}
-              publicRoute
-            />
-          )}
+          <AuthServingRuntimeSection
+            data={createDataInferenceService}
+            setData={setCreateDataInferenceService}
+            allowCreate={allowCreate}
+            publicRoute
+            showModelRoute={isAuthAvailable}
+          />
         </Stack>
       </Form>
     </Modal>
