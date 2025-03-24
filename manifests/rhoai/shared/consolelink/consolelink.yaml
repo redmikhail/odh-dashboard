@@ -12,4 +12,4 @@
   value: $(section-title)
 - op: replace
   path: /spec/href
-  value: https://rhods-dashboard-redhat-ods-applications.apps.ai-dev04.kni.syseng.devcluster.openshift.com
+  value: $(dashboard-url)
